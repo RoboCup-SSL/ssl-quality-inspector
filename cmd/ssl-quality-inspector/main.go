@@ -6,6 +6,7 @@ import (
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/clock"
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/network"
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/vision"
+	"sort"
 	"strings"
 	"time"
 )
@@ -51,13 +52,22 @@ func main() {
 
 		fmt.Println()
 		fmt.Println("Vision:")
-		for camId, camStats := range visionWatcher.CamStats {
+		for camId := range sortedCamIds(visionWatcher.CamStats) {
 			fmt.Println("Camera ", camId)
-			fmt.Println(camStats)
+			fmt.Println(visionWatcher.CamStats[camId])
 			fmt.Println()
 		}
 
 		fmt.Println()
 		time.Sleep(time.Second)
 	}
+}
+
+func sortedCamIds(camStats map[int]*vision.CamStats) []int {
+	keys := make([]int, 0, len(camStats))
+	for k := range camStats {
+		keys = append(keys, k)
+	}
+	sort.Ints(keys)
+	return keys
 }

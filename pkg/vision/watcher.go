@@ -1,9 +1,7 @@
 package vision
 
 import (
-	"fmt"
 	"github.com/RoboCup-SSL/ssl-go-tools/pkg/sslproto"
-	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/timing"
 	"github.com/golang/protobuf/proto"
 	"log"
 	"net"
@@ -23,32 +21,6 @@ func NewWatcher(address string, timeWindow time.Duration) (w Watcher) {
 	w.timeWindow = timeWindow
 	w.CamStats = map[int]*CamStats{}
 	return w
-}
-
-type CamStats struct {
-	FramesReceived   uint64
-	FramesDropped    uint32
-	Fps              *timing.Fps
-	TimingProcessing *timing.Timing
-	TimingReceiving  *timing.Timing
-	lastFrameId      uint32
-}
-
-func (s CamStats) String() string {
-	fps := s.Fps.Float32()
-	return fmt.Sprintf("%v frames received, %v lost @ %4.1f fps\nProcessing Time: %v\n Receiving Time: %v", s.FramesReceived, s.FramesDropped, fps, s.TimingProcessing, s.TimingReceiving)
-}
-
-func NewCamStats(timeWindow time.Duration) (s CamStats) {
-	s.Fps = new(timing.Fps)
-	s.TimingProcessing = new(timing.Timing)
-	s.TimingReceiving = new(timing.Timing)
-
-	*s.Fps = timing.NewFps(timeWindow)
-	*s.TimingProcessing = timing.NewTiming(timeWindow)
-	*s.TimingReceiving = timing.NewTiming(timeWindow)
-
-	return s
 }
 
 func (w *Watcher) Watch() {
@@ -99,9 +71,13 @@ func (w *Watcher) processDetectionMessage(frame *sslproto.SSL_DetectionFrame) {
 	if _, ok := w.CamStats[camId]; !ok {
 		w.CamStats[camId] = new(CamStats)
 		*w.CamStats[camId] = NewCamStats(w.timeWindow)
-	} else if *frame.FrameNumber > w.CamStats[camId].lastFrameId {
-		w.CamStats[camId].FramesDropped += *frame.FrameNumber - w.CamStats[camId].lastFrameId - 1
+	} else if *frame.FrameNumber > w.CamStats[camId].FrameStats.lastFrameId {
+		w.CamStats[camId].FrameStats.FramesDropped += *frame.FrameNumber - w.CamStats[camId].FrameStats.lastFrameId - 1
 	}
+	w.processCam(frame, w.CamStats[camId])
+}
+
+func (w *Watcher) processCam(frame *sslproto.SSL_DetectionFrame, camStats *CamStats) {
 
 	processingTime := time.Duration(int64((*frame.TSent - *frame.TCapture) * 1e9))
 
@@ -109,10 +85,31 @@ func (w *Watcher) processDetectionMessage(frame *sslproto.SSL_DetectionFrame) {
 	sentNs := int64((*frame.TSent - float64(sentSec)) * 1e9)
 	receivingTime := time.Now().Sub(time.Unix(sentSec, sentNs))
 
-	w.CamStats[camId].FramesReceived++
-	w.CamStats[camId].Fps.Inc()
-	w.CamStats[camId].TimingProcessing.Add(processingTime)
-	w.CamStats[camId].TimingReceiving.Add(receivingTime)
+	camStats.TimingProcessing.Add(processingTime)
+	camStats.TimingReceiving.Add(receivingTime)
 
-	w.CamStats[camId].lastFrameId = *frame.FrameNumber
+	camStats.FrameStats.FramesReceived++
+	camStats.FrameStats.Fps.Inc()
+	camStats.FrameStats.lastFrameId = *frame.FrameNumber
+
+	for _, robot := range frame.RobotsBlue {
+		robotId := NewRobotId(int(*robot.RobotId), TeamBlue)
+		w.processRobot(frame, camStats, robotId)
+	}
+	for _, robot := range frame.RobotsYellow {
+		robotId := NewRobotId(int(*robot.RobotId), TeamYellow)
+		w.processRobot(frame, camStats, robotId)
+	}
+}
+
+func (w *Watcher) processRobot(frame *sslproto.SSL_DetectionFrame, camStats *CamStats, robotId RobotId) {
+	if _, ok := camStats.Robots[robotId]; !ok {
+		camStats.Robots[robotId] = new(RobotStats)
+		*camStats.Robots[robotId] = NewRobotStats(w.timeWindow)
+	} else if *frame.FrameNumber > camStats.Robots[robotId].FrameStats.lastFrameId {
+		camStats.Robots[robotId].FrameStats.FramesDropped += *frame.FrameNumber - camStats.Robots[robotId].FrameStats.lastFrameId - 1
+	}
+	camStats.Robots[robotId].FrameStats.FramesReceived++
+	camStats.Robots[robotId].FrameStats.Fps.Inc()
+	camStats.Robots[robotId].FrameStats.lastFrameId = *frame.FrameNumber
 }
