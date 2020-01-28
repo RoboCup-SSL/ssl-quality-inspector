@@ -3,7 +3,9 @@ package vision
 import (
 	"fmt"
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/timing"
+	"math"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -24,27 +26,61 @@ func NewRobotId(id int, color TeamColor) RobotId {
 }
 
 func (s RobotId) String() string {
-	return fmt.Sprintf("%v %v", s.Id, s.Color)
+	return fmt.Sprintf("%2d %v", s.Id, s.Color)
 }
 
 type FrameStats struct {
-	FramesReceived uint64
-	FramesDropped  uint32
-	Fps            *timing.Fps
-	lastFrameId    uint32
+	Fps    *timing.Fps
+	frames map[uint32]time.Time
+	mutex  *sync.Mutex
 }
 
 func NewFrameStats(timeWindow time.Duration) (s *FrameStats) {
 	s = new(FrameStats)
 	s.Fps = new(timing.Fps)
 	*s.Fps = timing.NewFps(timeWindow)
+	s.frames = map[uint32]time.Time{}
+	s.mutex = new(sync.Mutex)
 
 	return s
 }
 
+func (s *FrameStats) Add(frameId uint32, t time.Time) {
+	s.mutex.Lock()
+	s.frames[frameId] = t
+	s.mutex.Unlock()
+}
+
+func (s *FrameStats) Prune(to time.Time) {
+	s.mutex.Lock()
+	for frameId, t := range s.frames {
+		if t.Before(to) {
+			delete(s.frames, frameId)
+		}
+	}
+	s.mutex.Unlock()
+}
+
+func (s *FrameStats) Quality() float64 {
+	min := uint32(math.MaxUint32)
+	max := uint32(0)
+	s.mutex.Lock()
+	for frameId := range s.frames {
+		if frameId < min {
+			min = frameId
+		}
+		if frameId > max {
+			max = frameId
+		}
+	}
+	sum := float64(len(s.frames))
+	s.mutex.Unlock()
+	return sum / float64(max-min+1)
+}
+
 func (s FrameStats) String() string {
 	fps := s.Fps.Float32()
-	return fmt.Sprintf("%v frames received, %v lost @ %4.1f fps", s.FramesReceived, s.FramesDropped, fps)
+	return fmt.Sprintf("%4.0f%% @ %3.0f fps", s.Quality()*100, fps)
 }
 
 type RobotStats struct {
@@ -81,10 +117,14 @@ func NewCamStats(timeWindow time.Duration) (s CamStats) {
 }
 
 func (s CamStats) String() string {
-	str := fmt.Sprintf("%v\nProcessing Time: %v\n Receiving Time: %v", s.FrameStats, s.TimingProcessing, s.TimingReceiving)
+	str := fmt.Sprintln(s.FrameStats)
+	str += fmt.Sprintf("Processing Time: %v\n Receiving Time: %v", s.TimingProcessing, s.TimingReceiving)
 	sortedIds := sortedRobotIds(s.Robots)
-	for _, robotId := range sortedIds {
-		str += fmt.Sprintf("\n%v %v", robotId.String(), s.Robots[robotId])
+	nHalf := len(sortedIds) / 2
+	for i := 0; i < nHalf; i++ {
+		robotLeft := sortedIds[i]
+		robotRight := sortedIds[i+nHalf]
+		str += fmt.Sprintf("\n%v %v     %v %v", robotLeft.String(), s.Robots[robotLeft], robotRight.String(), s.Robots[robotRight])
 	}
 	return str
 }

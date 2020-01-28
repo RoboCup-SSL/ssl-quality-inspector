@@ -14,14 +14,15 @@ import (
 //var refereeAddress = flag.String("refereeAddress", "224.5.23.1:10003", "The multicast address of ssl-game-controller")
 var visionAddress = flag.String("visionAddress", "224.5.23.2:10006", "The multicast address of ssl-vision")
 
-var timeWindow = flag.Duration("timeWindow", time.Second*5, "The time window for taking timing statistics")
+var timeWindow = flag.Duration("timeWindow", time.Millisecond*500, "The time window for taking timing statistics")
+var maxBotId = flag.Int("maxBotId", 16, "The max botId to pre-fill a slot for each robot")
 
 func main() {
 
 	multicastSources := network.NewMulticastSourceWatcher(*visionAddress)
 	go multicastSources.Watch()
 
-	visionWatcher := vision.NewWatcher(*visionAddress, *timeWindow)
+	visionWatcher := vision.NewWatcher(*visionAddress, *timeWindow, *maxBotId)
 	go visionWatcher.Watch()
 
 	var clockWatchers []clock.Watcher
@@ -53,7 +54,7 @@ func main() {
 		fmt.Println()
 		fmt.Println("Vision:")
 		for camId := range sortedCamIds(visionWatcher.CamStats) {
-			fmt.Println("Camera ", camId)
+			fmt.Print("Camera ", camId)
 			fmt.Println(visionWatcher.CamStats[camId])
 			fmt.Println()
 		}

@@ -1,12 +1,14 @@
 package timing
 
 import (
+	"sync"
 	"time"
 )
 
 type Fps struct {
 	TimeWindow time.Duration
 	durations  map[time.Time]struct{}
+	mutex      sync.Mutex
 }
 
 func NewFps(timeWindow time.Duration) (t Fps) {
@@ -16,21 +18,25 @@ func NewFps(timeWindow time.Duration) (t Fps) {
 }
 
 func (f *Fps) Inc() {
-	now := time.Now()
-	f.durations[now] = struct{}{}
+	f.mutex.Lock()
+	f.durations[time.Now()] = struct{}{}
+	f.mutex.Unlock()
+}
 
-	lastValidMeasureTime := now.Add(-f.TimeWindow)
-	var toBeDeleted []time.Time
+func (f *Fps) Prune() {
+	f.mutex.Lock()
+	lastValidMeasureTime := time.Now().Add(-f.TimeWindow)
 	for measuredTime := range f.durations {
 		if measuredTime.Before(lastValidMeasureTime) {
-			toBeDeleted = append(toBeDeleted, measuredTime)
+			delete(f.durations, measuredTime)
 		}
 	}
-	for _, measuredTime := range toBeDeleted {
-		delete(f.durations, measuredTime)
-	}
+	f.mutex.Unlock()
 }
 
 func (f *Fps) Float32() float32 {
-	return float32(len(f.durations)) / float32(f.TimeWindow.Seconds())
+	f.mutex.Lock()
+	numDurations := len(f.durations)
+	f.mutex.Unlock()
+	return float32(numDurations) / float32(f.TimeWindow.Seconds())
 }
