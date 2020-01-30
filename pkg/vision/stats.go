@@ -88,7 +88,21 @@ func (s *FrameStats) Quality() float64 {
 
 func (s FrameStats) String() string {
 	fps := s.Fps.Float32()
-	return fmt.Sprintf("%4.0f%% @ %3.0f fps", s.Quality()*100, fps)
+	quality := s.Quality()
+	return fmt.Sprintf("\u001b[%dm%4.0f%%\u001b[0m @ %3.0f fps", ansiColor(quality), quality*100, fps)
+}
+
+func ansiColor(value float64) int {
+	if value < 0.3 {
+		// Red
+		return 31
+	}
+	if value < 0.6 {
+		// Yellow
+		return 33
+	}
+	// Green
+	return 32
 }
 
 type RobotStats struct {
