@@ -11,10 +11,12 @@ import (
 const maxDatagramSize = 8192
 
 type Watcher struct {
-	Address    string
-	timeWindow time.Duration
-	maxBotId   int
-	CamStats   map[int]*CamStats
+	Address     string
+	timeWindow  time.Duration
+	maxBotId    int
+	CamStats    map[int]*CamStats
+	tSentLatest time.Time
+	tPruned     time.Time
 }
 
 func NewWatcher(address string, timeWindow time.Duration, maxBotId int) (w Watcher) {
@@ -40,6 +42,13 @@ func (w *Watcher) Watch() {
 	if err := conn.SetReadBuffer(maxDatagramSize); err != nil {
 		log.Printf("Could not set read buffer to %v.", maxDatagramSize)
 	}
+
+	go func() {
+		for {
+			w.prune()
+			time.Sleep(1 * time.Second)
+		}
+	}()
 
 	w.receive(conn)
 }
@@ -68,11 +77,40 @@ func (w *Watcher) receive(conn *net.UDPConn) {
 	}
 }
 
+func (w *Watcher) prune() {
+	if w.tPruned == w.tSentLatest {
+		for _, camStats := range w.CamStats {
+			camStats.FrameStats.Clear()
+			for _, robot := range camStats.Robots {
+				robot.FrameStats.Clear()
+			}
+		}
+	} else {
+		pruneTime := w.pruneTime()
+		for _, camStats := range w.CamStats {
+			camStats.FrameStats.Prune(pruneTime)
+			for _, robot := range camStats.Robots {
+				robot.FrameStats.Prune(pruneTime)
+			}
+		}
+		w.tPruned = w.tSentLatest
+	}
+}
+
+func (w *Watcher) pruneTime() time.Time {
+	return w.tSentLatest.Add(-w.timeWindow)
+}
+
 func (w *Watcher) processDetectionMessage(frame *sslproto.SSL_DetectionFrame) {
 	camId := int(*frame.CameraId)
 	if _, ok := w.CamStats[camId]; !ok {
 		w.CamStats[camId] = new(CamStats)
 		*w.CamStats[camId] = NewCamStats(w.timeWindow)
+
+		for botId := 0; botId < w.maxBotId; botId++ {
+			w.createRobotStats(w.CamStats[camId].Robots, NewRobotId(botId, TeamBlue))
+			w.createRobotStats(w.CamStats[camId].Robots, NewRobotId(botId, TeamYellow))
+		}
 	}
 	w.processCam(frame, w.CamStats[camId])
 }
@@ -91,13 +129,8 @@ func (w *Watcher) processCam(frame *sslproto.SSL_DetectionFrame, camStats *CamSt
 	camStats.TimingReceiving.Add(receivingTime)
 
 	camStats.FrameStats.Add(frameId, tSent)
-	camStats.FrameStats.Prune(tSent.Add(-w.timeWindow))
 	camStats.FrameStats.Fps.Inc()
-
-	for botId := 0; botId < w.maxBotId; botId++ {
-		w.pruneRobot(camStats.Robots, NewRobotId(botId, TeamBlue), tSent)
-		w.pruneRobot(camStats.Robots, NewRobotId(botId, TeamYellow), tSent)
-	}
+	camStats.FrameStats.Prune(w.pruneTime())
 
 	for _, robot := range frame.RobotsBlue {
 		robotId := NewRobotId(int(*robot.RobotId), TeamBlue)
@@ -107,18 +140,16 @@ func (w *Watcher) processCam(frame *sslproto.SSL_DetectionFrame, camStats *CamSt
 		robotId := NewRobotId(int(*robot.RobotId), TeamYellow)
 		w.updateRobot(camStats.Robots, robotId, frameId, tSent)
 	}
+	w.tSentLatest = tSent
 }
 
 func (w *Watcher) updateRobot(robots map[RobotId]*RobotStats, robotId RobotId, frameId uint32, tSent time.Time) {
 	robots[robotId].FrameStats.Add(frameId, tSent)
 	robots[robotId].FrameStats.Fps.Inc()
+	robots[robotId].FrameStats.Prune(w.pruneTime())
 }
 
-func (w *Watcher) pruneRobot(robots map[RobotId]*RobotStats, robotId RobotId, tSent time.Time) {
-	if _, ok := robots[robotId]; !ok {
-		robots[robotId] = new(RobotStats)
-		*robots[robotId] = NewRobotStats(w.timeWindow)
-	}
-	robots[robotId].FrameStats.Prune(tSent.Add(-w.timeWindow))
-	robots[robotId].FrameStats.Fps.Prune()
+func (w *Watcher) createRobotStats(robots map[RobotId]*RobotStats, robotId RobotId) {
+	robots[robotId] = new(RobotStats)
+	*robots[robotId] = NewRobotStats(w.timeWindow)
 }

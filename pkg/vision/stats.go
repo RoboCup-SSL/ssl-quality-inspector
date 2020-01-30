@@ -58,6 +58,14 @@ func (s *FrameStats) Prune(to time.Time) {
 			delete(s.frames, frameId)
 		}
 	}
+	s.Fps.Prune()
+	s.mutex.Unlock()
+}
+
+func (s *FrameStats) Clear() {
+	s.mutex.Lock()
+	s.frames = map[uint32]time.Time{}
+	s.Fps.Clear()
 	s.mutex.Unlock()
 }
 

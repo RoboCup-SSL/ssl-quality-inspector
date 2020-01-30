@@ -34,6 +34,12 @@ func (f *Fps) Prune() {
 	f.mutex.Unlock()
 }
 
+func (f *Fps) Clear() {
+	f.mutex.Lock()
+	f.durations = map[time.Time]struct{}{}
+	f.mutex.Unlock()
+}
+
 func (f *Fps) Float32() float32 {
 	f.mutex.Lock()
 	numDurations := len(f.durations)
