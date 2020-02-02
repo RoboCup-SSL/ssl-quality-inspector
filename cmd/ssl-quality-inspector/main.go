@@ -59,14 +59,14 @@ func main() {
 			fmt.Println()
 		}
 
-		numLogs := len(visionWatcher.Log)
+		numLogs := len(visionWatcher.LogList)
 		nEntries := 20
 		oldest := numLogs - 1 - nEntries
 		if oldest < 0 {
 			oldest = 0
 		}
 		for i := oldest; i < numLogs; i++ {
-			fmt.Println(visionWatcher.Log[i])
+			fmt.Println(visionWatcher.LogList[i])
 		}
 
 		fmt.Println()

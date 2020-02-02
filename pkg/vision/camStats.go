@@ -12,6 +12,7 @@ type CamStats struct {
 	TimingProcessing *timing.Timing
 	TimingReceiving  *timing.Timing
 	Robots           map[RobotId]*RobotStats
+	Balls            []*BallStats
 	NumRobots        map[TeamColor]int
 }
 
@@ -35,14 +36,21 @@ func (s CamStats) String() string {
 	str += fmt.Sprintf(" | %v blue | %v yellow | %v balls\n",
 		colorizeByTeam(s.NumRobots[TeamBlue], TeamBlue),
 		colorizeByTeam(s.NumRobots[TeamYellow], TeamYellow),
-		0)
-	str += fmt.Sprintf("Processing Time: %v\n Receiving Time: %v", s.TimingProcessing, s.TimingReceiving)
+		len(s.Balls))
+	str += fmt.Sprintf("Processing Time: %v\n Receiving Time: %v\n", s.TimingProcessing, s.TimingReceiving)
+
+	str += "Balls: "
+	for _, ball := range s.Balls {
+		str += fmt.Sprintf("%v  ", ball)
+	}
+	str += "\n"
+
 	sortedIds := sortedRobotIds(s.Robots)
 	nHalf := len(sortedIds) / 2
 	for i := 0; i < nHalf; i++ {
 		robotLeft := sortedIds[i]
 		robotRight := sortedIds[i+nHalf]
-		str += fmt.Sprintf("\n%v %v     %v %v", robotLeft.String(), s.Robots[robotLeft], robotRight.String(), s.Robots[robotRight])
+		str += fmt.Sprintf("%v %v     %v %v\n", robotLeft.String(), s.Robots[robotLeft], robotRight.String(), s.Robots[robotRight])
 	}
 	return str
 }

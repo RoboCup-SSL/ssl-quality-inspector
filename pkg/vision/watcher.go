@@ -18,7 +18,7 @@ type Watcher struct {
 	CamStats    map[int]*CamStats
 	tSentLatest time.Time
 	tPruned     time.Time
-	Log         []string
+	LogList     []string
 }
 
 func NewWatcher(address string, timeWindow time.Duration, maxBotId int) (w Watcher) {
@@ -27,6 +27,11 @@ func NewWatcher(address string, timeWindow time.Duration, maxBotId int) (w Watch
 	w.maxBotId = maxBotId
 	w.CamStats = map[int]*CamStats{}
 	return w
+}
+
+func (w *Watcher) Log(tSent time.Time, str string) {
+	timeFormatted := tSent.Format("2006-01-02T15:04:05.000")
+	w.LogList = append(w.LogList, timeFormatted+": "+str)
 }
 
 func (w *Watcher) Watch() {
@@ -157,9 +162,51 @@ func (w *Watcher) processCam(frame *sslproto.SSL_DetectionFrame, camStats *CamSt
 		camStats.NumRobots[teamColor] = numRobots
 	}
 
-	// TODO ball
+	for _, newBall := range frame.Balls {
+		newPos := Position2d{X: *newBall.X / 1000.0, Y: *newBall.Y / 1000.0}
+		ball := w.ballStats(tSent, newPos, camStats)
+		ball.Add(tSent, newPos, frameId)
+	}
+
+	w.pruneBalls(camStats, tSent)
 
 	w.tSentLatest = tSent
+}
+
+func (w *Watcher) pruneBalls(camStats *CamStats, tSent time.Time) {
+	var newBalls []*BallStats
+	for _, ball := range camStats.Balls {
+		if tSent.Sub(ball.LastDetection.Time).Seconds() < 1 {
+			newBalls = append(newBalls, ball)
+			ball.FrameStats.Prune(w.pruneTime())
+			w.updateBallVisibility(ball, tSent)
+		}
+	}
+	camStats.Balls = newBalls
+}
+
+func (w *Watcher) ballStats(tSent time.Time, newBallPos Position2d, camStats *CamStats) *BallStats {
+	for _, ball := range camStats.Balls {
+		if ball.Matches(tSent, newBallPos) {
+			return ball
+		}
+	}
+	stats := NewBallStats(w.timeWindow, Detection{Pos: newBallPos, Time: tSent})
+	camStats.Balls = append(camStats.Balls, &stats)
+	return &stats
+}
+
+func (w *Watcher) updateBallVisibility(ball *BallStats, tSent time.Time) {
+	numFrames := ball.FrameStats.NumFrames()
+	quality := ball.FrameStats.Quality()
+	if ball.Visible && numFrames == 0 {
+		dt := tSent.Sub(ball.LastDetection.Time).Seconds()
+		w.Log(tSent, fmt.Sprintf("Ball vanished at %v after %.1fs", ball.LastDetection.Pos, dt))
+		ball.Visible = false
+	} else if !ball.Visible && quality > 0.9 {
+		w.Log(tSent, fmt.Sprintf("Ball appeared at %v", ball.LastDetection.Pos))
+		ball.Visible = true
+	}
 }
 
 func (w *Watcher) updateRobot(robots map[RobotId]*RobotStats, robotId RobotId, frameId uint32, tSent time.Time) {
@@ -173,10 +220,10 @@ func (w *Watcher) pruneRobot(robots map[RobotId]*RobotStats, robotId RobotId, tS
 	numFrames := robots[robotId].FrameStats.NumFrames()
 	quality := robots[robotId].FrameStats.Quality()
 	if robots[robotId].Visible && numFrames == 0 {
-		w.Log = append(w.Log, fmt.Sprintf("%v: Robot %v vanished", tSent, robotId))
+		w.Log(tSent, fmt.Sprintf("Robot %v vanished", robotId))
 		robots[robotId].Visible = false
 	} else if !robots[robotId].Visible && quality > 0.9 {
-		w.Log = append(w.Log, fmt.Sprintf("%v: Robot %v appeared", tSent, robotId))
+		w.Log(tSent, fmt.Sprintf("Robot %v appeared", robotId))
 		robots[robotId].Visible = true
 	}
 }
