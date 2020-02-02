@@ -12,7 +12,7 @@ type CamStats struct {
 	TimingProcessing *timing.Timing
 	TimingReceiving  *timing.Timing
 	Robots           map[RobotId]*RobotStats
-	NumRobots        map[TeamColor]*int
+	NumRobots        map[TeamColor]int
 }
 
 func NewCamStats(timeWindow time.Duration) (s CamStats) {
@@ -23,9 +23,9 @@ func NewCamStats(timeWindow time.Duration) (s CamStats) {
 	*s.TimingProcessing = timing.NewTiming(timeWindow)
 	*s.TimingReceiving = timing.NewTiming(timeWindow)
 	s.Robots = map[RobotId]*RobotStats{}
-	s.NumRobots = map[TeamColor]*int{}
-	s.NumRobots[TeamYellow] = new(int)
-	s.NumRobots[TeamBlue] = new(int)
+	s.NumRobots = map[TeamColor]int{}
+	s.NumRobots[TeamYellow] = 0
+	s.NumRobots[TeamBlue] = 0
 
 	return s
 }
@@ -33,8 +33,8 @@ func NewCamStats(timeWindow time.Duration) (s CamStats) {
 func (s CamStats) String() string {
 	str := fmt.Sprint(s.FrameStats)
 	str += fmt.Sprintf(" | %v blue | %v yellow | %v balls\n",
-		colorizeByTeam(*s.NumRobots[TeamBlue], TeamBlue),
-		colorizeByTeam(*s.NumRobots[TeamYellow], TeamYellow),
+		colorizeByTeam(s.NumRobots[TeamBlue], TeamBlue),
+		colorizeByTeam(s.NumRobots[TeamYellow], TeamYellow),
 		0)
 	str += fmt.Sprintf("Processing Time: %v\n Receiving Time: %v", s.TimingProcessing, s.TimingReceiving)
 	sortedIds := sortedRobotIds(s.Robots)

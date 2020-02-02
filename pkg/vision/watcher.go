@@ -154,7 +154,7 @@ func (w *Watcher) processCam(frame *sslproto.SSL_DetectionFrame, camStats *CamSt
 				numRobots++
 			}
 		}
-		*camStats.NumRobots[teamColor] = numRobots
+		camStats.NumRobots[teamColor] = numRobots
 	}
 
 	// TODO ball
