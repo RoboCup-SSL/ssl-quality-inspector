@@ -2,16 +2,17 @@ package vision
 
 import (
 	"fmt"
+	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/timing"
 	"time"
 )
 
 type RobotStats struct {
-	FrameStats *FrameStats
+	FrameStats *timing.FrameStats
 	Visible    bool
 }
 
 func NewRobotStats(timeWindow time.Duration) (s RobotStats) {
-	s.FrameStats = NewFrameStats(timeWindow)
+	s.FrameStats = timing.NewFrameStats(timeWindow)
 
 	return s
 }

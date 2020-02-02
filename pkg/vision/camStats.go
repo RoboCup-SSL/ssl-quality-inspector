@@ -8,7 +8,7 @@ import (
 )
 
 type CamStats struct {
-	FrameStats       *FrameStats
+	FrameStats       *timing.FrameStats
 	TimingProcessing *timing.Timing
 	TimingReceiving  *timing.Timing
 	Robots           map[RobotId]*RobotStats
@@ -19,7 +19,7 @@ func NewCamStats(timeWindow time.Duration) (s CamStats) {
 	s.TimingProcessing = new(timing.Timing)
 	s.TimingReceiving = new(timing.Timing)
 
-	s.FrameStats = NewFrameStats(timeWindow)
+	s.FrameStats = timing.NewFrameStats(timeWindow)
 	*s.TimingProcessing = timing.NewTiming(timeWindow)
 	*s.TimingReceiving = timing.NewTiming(timeWindow)
 	s.Robots = map[RobotId]*RobotStats{}

@@ -1,23 +1,22 @@
-package vision
+package timing
 
 import (
 	"fmt"
-	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/timing"
 	"math"
 	"sync"
 	"time"
 )
 
 type FrameStats struct {
-	Fps    *timing.Fps
+	Fps    *Fps
 	frames map[uint32]time.Time
 	mutex  *sync.Mutex
 }
 
 func NewFrameStats(timeWindow time.Duration) (s *FrameStats) {
 	s = new(FrameStats)
-	s.Fps = new(timing.Fps)
-	*s.Fps = timing.NewFps(timeWindow)
+	s.Fps = new(Fps)
+	*s.Fps = NewFps(timeWindow)
 	s.frames = map[uint32]time.Time{}
 	s.mutex = new(sync.Mutex)
 
