@@ -26,7 +26,22 @@ func NewRobotId(id int, color TeamColor) RobotId {
 }
 
 func (s RobotId) String() string {
-	return fmt.Sprintf("%2d %v", s.Id, s.Color)
+	return fmt.Sprintf("%v %v",
+		colorizeByTeam(fmt.Sprintf("%2d", s.Id), s.Color),
+		colorizeByTeam(s.Color, s.Color))
+}
+
+func colorizeByTeam(str interface{}, team TeamColor) string {
+	var color int
+	switch team {
+	case TeamBlue:
+		color = 34
+	case TeamYellow:
+		color = 93
+	default:
+		return fmt.Sprintf("%v", str)
+	}
+	return fmt.Sprintf("\u001b[%dm%v\u001b[0m", color, str)
 }
 
 type FrameStats struct {
@@ -86,6 +101,10 @@ func (s *FrameStats) Quality() float64 {
 	return sum / float64(max-min+1)
 }
 
+func (s *FrameStats) NumFrames() int {
+	return len(s.frames)
+}
+
 func (s FrameStats) String() string {
 	fps := s.Fps.Float32()
 	quality := s.Quality()
@@ -107,6 +126,7 @@ func ansiColor(value float64) int {
 
 type RobotStats struct {
 	FrameStats *FrameStats
+	Visible    bool
 }
 
 func NewRobotStats(timeWindow time.Duration) (s RobotStats) {
@@ -124,6 +144,7 @@ type CamStats struct {
 	TimingProcessing *timing.Timing
 	TimingReceiving  *timing.Timing
 	Robots           map[RobotId]*RobotStats
+	NumRobots        map[TeamColor]*int
 }
 
 func NewCamStats(timeWindow time.Duration) (s CamStats) {
@@ -134,12 +155,19 @@ func NewCamStats(timeWindow time.Duration) (s CamStats) {
 	*s.TimingProcessing = timing.NewTiming(timeWindow)
 	*s.TimingReceiving = timing.NewTiming(timeWindow)
 	s.Robots = map[RobotId]*RobotStats{}
+	s.NumRobots = map[TeamColor]*int{}
+	s.NumRobots[TeamYellow] = new(int)
+	s.NumRobots[TeamBlue] = new(int)
 
 	return s
 }
 
 func (s CamStats) String() string {
-	str := fmt.Sprintln(s.FrameStats)
+	str := fmt.Sprint(s.FrameStats)
+	str += fmt.Sprintf(" | %v blue | %v yellow | %v balls\n",
+		colorizeByTeam(*s.NumRobots[TeamBlue], TeamBlue),
+		colorizeByTeam(*s.NumRobots[TeamYellow], TeamYellow),
+		0)
 	str += fmt.Sprintf("Processing Time: %v\n Receiving Time: %v", s.TimingProcessing, s.TimingReceiving)
 	sortedIds := sortedRobotIds(s.Robots)
 	nHalf := len(sortedIds) / 2

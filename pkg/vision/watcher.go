@@ -1,6 +1,7 @@
 package vision
 
 import (
+	"fmt"
 	"github.com/RoboCup-SSL/ssl-go-tools/pkg/sslproto"
 	"github.com/golang/protobuf/proto"
 	"log"
@@ -17,6 +18,7 @@ type Watcher struct {
 	CamStats    map[int]*CamStats
 	tSentLatest time.Time
 	tPruned     time.Time
+	Log         []string
 }
 
 func NewWatcher(address string, timeWindow time.Duration, maxBotId int) (w Watcher) {
@@ -140,13 +142,43 @@ func (w *Watcher) processCam(frame *sslproto.SSL_DetectionFrame, camStats *CamSt
 		robotId := NewRobotId(int(*robot.RobotId), TeamYellow)
 		w.updateRobot(camStats.Robots, robotId, frameId, tSent)
 	}
+	for botId := 0; botId < w.maxBotId; botId++ {
+		w.pruneRobot(camStats.Robots, NewRobotId(botId, TeamBlue), tSent)
+		w.pruneRobot(camStats.Robots, NewRobotId(botId, TeamYellow), tSent)
+	}
+
+	for teamColor := range camStats.NumRobots {
+		numRobots := 0
+		for botId := 0; botId < w.maxBotId; botId++ {
+			if camStats.Robots[NewRobotId(botId, teamColor)].Visible {
+				numRobots++
+			}
+		}
+		*camStats.NumRobots[teamColor] = numRobots
+	}
+
+	// TODO ball
+
 	w.tSentLatest = tSent
 }
 
 func (w *Watcher) updateRobot(robots map[RobotId]*RobotStats, robotId RobotId, frameId uint32, tSent time.Time) {
 	robots[robotId].FrameStats.Add(frameId, tSent)
 	robots[robotId].FrameStats.Fps.Inc()
+}
+
+func (w *Watcher) pruneRobot(robots map[RobotId]*RobotStats, robotId RobotId, tSent time.Time) {
 	robots[robotId].FrameStats.Prune(w.pruneTime())
+
+	numFrames := robots[robotId].FrameStats.NumFrames()
+	quality := robots[robotId].FrameStats.Quality()
+	if robots[robotId].Visible && numFrames == 0 {
+		w.Log = append(w.Log, fmt.Sprintf("%v: Robot %v vanished", tSent, robotId))
+		robots[robotId].Visible = false
+	} else if !robots[robotId].Visible && quality > 0.9 {
+		w.Log = append(w.Log, fmt.Sprintf("%v: Robot %v appeared", tSent, robotId))
+		robots[robotId].Visible = true
+	}
 }
 
 func (w *Watcher) createRobotStats(robots map[RobotId]*RobotStats, robotId RobotId) {
