@@ -10,6 +10,7 @@ const maxBallVel = 10
 
 type BallStats struct {
 	FrameStats    *timing.FrameStats
+	timeWindow    time.Duration
 	Visible       bool
 	LastDetection Detection
 }
@@ -21,6 +22,7 @@ type Detection struct {
 
 func NewBallStats(timeWindow time.Duration, detection Detection) (s BallStats) {
 	s.FrameStats = timing.NewFrameStats(timeWindow)
+	s.timeWindow = timeWindow
 	s.LastDetection = detection
 	s.Visible = false
 
@@ -38,9 +40,13 @@ func (s *BallStats) Matches(t time.Time, pos Position2d) bool {
 	return v < maxBallVel
 }
 
-func (s *BallStats) Add(tSent time.Time, pos Position2d, frameId uint32) {
+func (s *BallStats) Add(tSent time.Time, frameId uint32, pos Position2d) {
 	s.LastDetection.Time = tSent
 	s.LastDetection.Pos = pos
 	s.FrameStats.Add(frameId, tSent)
 	s.FrameStats.Fps.Inc()
+}
+
+func (s *BallStats) Prune(tSent time.Time) {
+	s.FrameStats.Prune(tSent.Add(-s.timeWindow))
 }

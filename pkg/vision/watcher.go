@@ -87,37 +87,21 @@ func (w *Watcher) receive(conn *net.UDPConn) {
 func (w *Watcher) prune() {
 	if w.tPruned == w.tSentLatest {
 		for _, camStats := range w.CamStats {
-			camStats.FrameStats.Clear()
-			for _, robot := range camStats.Robots {
-				robot.FrameStats.Clear()
-			}
+			camStats.Clear()
 		}
 	} else {
-		pruneTime := w.pruneTime()
 		for _, camStats := range w.CamStats {
-			camStats.FrameStats.Prune(pruneTime)
-			for _, robot := range camStats.Robots {
-				robot.FrameStats.Prune(pruneTime)
-			}
+			camStats.Prune(w.tSentLatest)
 		}
 		w.tPruned = w.tSentLatest
 	}
-}
-
-func (w *Watcher) pruneTime() time.Time {
-	return w.tSentLatest.Add(-w.timeWindow)
 }
 
 func (w *Watcher) processDetectionMessage(frame *sslproto.SSL_DetectionFrame) {
 	camId := int(*frame.CameraId)
 	if _, ok := w.CamStats[camId]; !ok {
 		w.CamStats[camId] = new(CamStats)
-		*w.CamStats[camId] = NewCamStats(w.timeWindow)
-
-		for botId := 0; botId < w.maxBotId; botId++ {
-			w.createRobotStats(w.CamStats[camId].Robots, NewRobotId(botId, TeamBlue))
-			w.createRobotStats(w.CamStats[camId].Robots, NewRobotId(botId, TeamYellow))
-		}
+		*w.CamStats[camId] = NewCamStats(w.timeWindow, w.maxBotId)
 	}
 	w.processCam(frame, w.CamStats[camId])
 }
@@ -137,35 +121,25 @@ func (w *Watcher) processCam(frame *sslproto.SSL_DetectionFrame, camStats *CamSt
 
 	camStats.FrameStats.Add(frameId, tSent)
 	camStats.FrameStats.Fps.Inc()
-	camStats.FrameStats.Prune(w.pruneTime())
+	camStats.Prune(tSent)
 
 	for _, robot := range frame.RobotsBlue {
 		robotId := NewRobotId(int(*robot.RobotId), TeamBlue)
-		w.updateRobot(camStats.Robots, robotId, frameId, tSent)
+		camStats.Robots[robotId].Add(tSent, frameId)
+		w.updateRobotVisibility(camStats.Robots, robotId, tSent)
 	}
 	for _, robot := range frame.RobotsYellow {
 		robotId := NewRobotId(int(*robot.RobotId), TeamYellow)
-		w.updateRobot(camStats.Robots, robotId, frameId, tSent)
-	}
-	for botId := 0; botId < w.maxBotId; botId++ {
-		w.pruneRobot(camStats.Robots, NewRobotId(botId, TeamBlue), tSent)
-		w.pruneRobot(camStats.Robots, NewRobotId(botId, TeamYellow), tSent)
+		camStats.Robots[robotId].Add(tSent, frameId)
+		w.updateRobotVisibility(camStats.Robots, robotId, tSent)
 	}
 
-	for teamColor := range camStats.NumRobots {
-		numRobots := 0
-		for botId := 0; botId < w.maxBotId; botId++ {
-			if camStats.Robots[NewRobotId(botId, teamColor)].Visible {
-				numRobots++
-			}
-		}
-		camStats.NumRobots[teamColor] = numRobots
-	}
+	camStats.Update()
 
 	for _, newBall := range frame.Balls {
 		newPos := Position2d{X: *newBall.X / 1000.0, Y: *newBall.Y / 1000.0}
 		ball := w.ballStats(tSent, newPos, camStats)
-		ball.Add(tSent, newPos, frameId)
+		ball.Add(tSent, frameId, newPos)
 	}
 
 	w.pruneBalls(camStats, tSent)
@@ -178,7 +152,6 @@ func (w *Watcher) pruneBalls(camStats *CamStats, tSent time.Time) {
 	for _, ball := range camStats.Balls {
 		if tSent.Sub(ball.LastDetection.Time).Seconds() < 1 {
 			newBalls = append(newBalls, ball)
-			ball.FrameStats.Prune(w.pruneTime())
 			w.updateBallVisibility(ball, tSent)
 		}
 	}
@@ -214,9 +187,7 @@ func (w *Watcher) updateRobot(robots map[RobotId]*RobotStats, robotId RobotId, f
 	robots[robotId].FrameStats.Fps.Inc()
 }
 
-func (w *Watcher) pruneRobot(robots map[RobotId]*RobotStats, robotId RobotId, tSent time.Time) {
-	robots[robotId].FrameStats.Prune(w.pruneTime())
-
+func (w *Watcher) updateRobotVisibility(robots map[RobotId]*RobotStats, robotId RobotId, tSent time.Time) {
 	numFrames := robots[robotId].FrameStats.NumFrames()
 	quality := robots[robotId].FrameStats.Quality()
 	if robots[robotId].Visible && numFrames == 0 {
@@ -226,9 +197,4 @@ func (w *Watcher) pruneRobot(robots map[RobotId]*RobotStats, robotId RobotId, tS
 		w.Log(tSent, fmt.Sprintf("Robot %v appeared", robotId))
 		robots[robotId].Visible = true
 	}
-}
-
-func (w *Watcher) createRobotStats(robots map[RobotId]*RobotStats, robotId RobotId) {
-	robots[robotId] = new(RobotStats)
-	*robots[robotId] = NewRobotStats(w.timeWindow)
 }
