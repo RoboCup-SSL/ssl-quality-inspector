@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-//var refereeAddress = flag.String("refereeAddress", "224.5.23.1:10003", "The multicast address of ssl-game-controller")
 var visionAddress = flag.String("visionAddress", "224.5.23.2:10006", "The multicast address of ssl-vision")
 
 var timeWindow = flag.Duration("timeWindow", time.Millisecond*500, "The time window for taking timing statistics")
@@ -22,7 +21,8 @@ func main() {
 	multicastSources := network.NewMulticastSourceWatcher(*visionAddress)
 	go multicastSources.Watch()
 
-	visionWatcher := vision.NewWatcher(*visionAddress, *timeWindow, *maxBotId)
+	stats := vision.NewStats(*timeWindow, *maxBotId)
+	visionWatcher := vision.NewUdpWatcher(*visionAddress, stats.Process)
 	go visionWatcher.Watch()
 
 	var clockWatchers []*clock.Watcher
@@ -55,25 +55,25 @@ func main() {
 			clockWatcher.Mutex.Unlock()
 		}
 
-		visionWatcher.Mutex.Lock()
+		stats.Mutex.Lock()
 		fmt.Println()
 		fmt.Println("Vision:")
-		for camId := range sortedCamIds(visionWatcher.CamStats) {
+		for camId := range sortedCamIds(stats.CamStats) {
 			fmt.Print("Camera ", camId)
-			fmt.Println(visionWatcher.CamStats[camId])
+			fmt.Println(stats.CamStats[camId])
 			fmt.Println()
 		}
 
-		numLogs := len(visionWatcher.LogList)
+		numLogs := len(stats.LogList)
 		nEntries := 20
 		oldest := numLogs - 1 - nEntries
 		if oldest < 0 {
 			oldest = 0
 		}
 		for i := oldest; i < numLogs; i++ {
-			fmt.Println(visionWatcher.LogList[i])
+			fmt.Println(stats.LogList[i])
 		}
-		visionWatcher.Mutex.Unlock()
+		stats.Mutex.Unlock()
 
 		fmt.Println()
 		time.Sleep(time.Second)
