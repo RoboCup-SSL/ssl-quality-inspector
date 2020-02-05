@@ -6,6 +6,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,7 @@ type Watcher struct {
 	tSentLatest time.Time
 	tPruned     time.Time
 	LogList     []string
+	Mutex       sync.Mutex
 }
 
 func NewWatcher(address string, timeWindow time.Duration, maxBotId int) (w Watcher) {
@@ -52,7 +54,9 @@ func (w *Watcher) Watch() {
 
 	go func() {
 		for {
+			w.Mutex.Lock()
 			w.prune()
+			w.Mutex.Unlock()
 			time.Sleep(1 * time.Second)
 		}
 	}()
@@ -79,7 +83,9 @@ func (w *Watcher) receive(conn *net.UDPConn) {
 		}
 
 		if wrapper.Detection != nil {
+			w.Mutex.Lock()
 			w.processDetectionMessage(wrapper.Detection)
+			w.Mutex.Unlock()
 		}
 	}
 }

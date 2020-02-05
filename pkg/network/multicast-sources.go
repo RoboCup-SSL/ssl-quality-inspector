@@ -3,6 +3,7 @@ package network
 import (
 	"log"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -11,6 +12,7 @@ const maxDatagramSize = 8192
 type MulticastSourceWatcher struct {
 	Address string
 	Sources []string
+	Mutex   sync.Mutex
 }
 
 func NewMulticastSourceWatcher(address string) (w MulticastSourceWatcher) {
@@ -42,7 +44,9 @@ func (w *MulticastSourceWatcher) watchAddress(address string) {
 			time.Sleep(1 * time.Second)
 			continue
 		}
+		w.Mutex.Lock()
 		w.addSource(address, udpAddr.IP.String())
+		w.Mutex.Unlock()
 	}
 }
 

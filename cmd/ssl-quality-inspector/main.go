@@ -25,14 +25,15 @@ func main() {
 	visionWatcher := vision.NewWatcher(*visionAddress, *timeWindow, *maxBotId)
 	go visionWatcher.Watch()
 
-	var clockWatchers []clock.Watcher
+	var clockWatchers []*clock.Watcher
 	activeSources := map[string]struct{}{}
 
 	for {
+		multicastSources.Mutex.Lock()
 		for _, source := range multicastSources.Sources {
 			if _, ok := activeSources[source]; !ok {
 				clockWatcher := clock.NewWatcher(source, *timeWindow)
-				clockWatchers = append(clockWatchers, clockWatcher)
+				clockWatchers = append(clockWatchers, &clockWatcher)
 				go clockWatcher.Watch()
 				activeSources[source] = struct{}{}
 			}
@@ -43,14 +44,18 @@ func main() {
 
 		fmt.Println("Vision Multicast sources:")
 		fmt.Println(strings.Join(multicastSources.Sources, " "))
+		multicastSources.Mutex.Unlock()
 
 		fmt.Println()
 		fmt.Println("Reference clocks:")
 		for _, clockWatcher := range clockWatchers {
+			clockWatcher.Mutex.Lock()
 			fmt.Println(clockWatcher.Host, " ClockOffset: ", clockWatcher.ClockOffset)
 			fmt.Println(clockWatcher.Host, "         RTT: ", clockWatcher.RTT)
+			clockWatcher.Mutex.Unlock()
 		}
 
+		visionWatcher.Mutex.Lock()
 		fmt.Println()
 		fmt.Println("Vision:")
 		for camId := range sortedCamIds(visionWatcher.CamStats) {
@@ -68,6 +73,7 @@ func main() {
 		for i := oldest; i < numLogs; i++ {
 			fmt.Println(visionWatcher.LogList[i])
 		}
+		visionWatcher.Mutex.Unlock()
 
 		fmt.Println()
 		time.Sleep(time.Second)

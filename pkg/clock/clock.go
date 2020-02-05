@@ -3,6 +3,7 @@ package clock
 import (
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/timing"
 	"github.com/beevik/ntp"
+	"sync"
 	"time"
 )
 
@@ -11,6 +12,7 @@ type Watcher struct {
 	online      bool
 	ClockOffset *timing.Timing
 	RTT         *timing.Timing
+	Mutex       sync.Mutex
 }
 
 func NewWatcher(host string, timeWindow time.Duration) (w Watcher) {
@@ -28,6 +30,7 @@ func NewWatcher(host string, timeWindow time.Duration) (w Watcher) {
 func (w *Watcher) Watch() {
 	for {
 		response, err := ntp.Query(w.Host)
+		w.Mutex.Lock()
 		if err != nil {
 			w.online = false
 			w.ClockOffset.Clear()
@@ -38,6 +41,7 @@ func (w *Watcher) Watch() {
 			w.ClockOffset.Add(response.ClockOffset)
 			w.RTT.Add(response.RTT)
 		}
+		w.Mutex.Unlock()
 		time.Sleep(time.Millisecond * 100)
 	}
 }
