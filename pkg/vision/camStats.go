@@ -3,6 +3,7 @@ package vision
 import (
 	"fmt"
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/timing"
+	"sort"
 	"time"
 )
 
@@ -46,10 +47,8 @@ func (s CamStats) String() string {
 	}
 	str += "\n"
 
-	for teamColor := range s.Robots {
-		for _, robot := range s.Robots[teamColor] {
-			str += fmt.Sprintf("%v %v\n", robot.Id, robot)
-		}
+	for _, robot := range s.sortedRobotStats() {
+		str += fmt.Sprintf("%v %v\n", robot.Id, robot)
 	}
 	return str
 }
@@ -118,4 +117,24 @@ func (s *CamStats) GetRobotStats(id RobotId, tSent time.Time, newPos Position2d)
 	robot := NewRobotStats(id, Detection{Pos: newPos, Time: tSent}, s.timeWindow)
 	s.Robots[id.Color] = append(s.Robots[id.Color], &robot)
 	return &robot
+}
+
+func (s *CamStats) sortedRobotStats() []*RobotStats {
+	var robots []*RobotStats
+
+	for teamColor := range s.Robots {
+		for _, robot := range s.Robots[teamColor] {
+			robots = append(robots, robot)
+		}
+	}
+	sort.Slice(robots, func(i, j int) bool {
+		if robots[i].Age() != robots[j].Age() {
+			return robots[i].Age() > robots[j].Age()
+		}
+		if robots[i].Id.Color != robots[j].Id.Color {
+			return robots[i].Id.Color < robots[j].Id.Color
+		}
+		return robots[i].Id.Id < robots[j].Id.Id
+	})
+	return robots
 }

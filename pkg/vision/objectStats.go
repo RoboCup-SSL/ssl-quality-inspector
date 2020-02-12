@@ -29,7 +29,9 @@ func NewObjectStats(detection Detection, timeWindow time.Duration) (s ObjectStat
 }
 
 func (s ObjectStats) String() string {
-	return fmt.Sprintf("%v", s.FrameStats)
+	age := s.Age()
+	age = time.Duration(age.Milliseconds() * 1_000_000)
+	return fmt.Sprintf("%v | %v", s.FrameStats, age)
 }
 
 func (s *ObjectStats) Matches(t time.Time, pos Position2d, maxVel float64) bool {
