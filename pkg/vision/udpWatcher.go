@@ -37,11 +37,9 @@ func (w *UdpWatcher) Watch() {
 		log.Printf("Could not set read buffer to %v.", maxDatagramSize)
 	}
 
+	c1 := make(chan *sslproto.SSL_WrapperPacket, 10)
+	go w.receive(conn, c1)
 	for {
-		c1 := make(chan *sslproto.SSL_WrapperPacket, 1)
-
-		go w.receive(conn, c1)
-
 		select {
 		case wrapper := <-c1:
 			w.Callback(wrapper)
