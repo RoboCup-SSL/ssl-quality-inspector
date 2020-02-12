@@ -26,6 +26,7 @@ func NewFrameStats(timeWindow time.Duration) (s *FrameStats) {
 func (s *FrameStats) Add(frameId uint32, t time.Time) {
 	s.mutex.Lock()
 	s.frames[frameId] = t
+	s.Fps.Inc()
 	s.mutex.Unlock()
 }
 
