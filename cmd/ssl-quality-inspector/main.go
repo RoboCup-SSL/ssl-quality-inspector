@@ -8,6 +8,7 @@ import (
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/vision"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -22,17 +23,22 @@ func main() {
 	go multicastSources.Watch()
 
 	stats := vision.NewStats(*timeWindow, *maxBotId)
-	visionWatcher := vision.NewUdpWatcher(*visionAddress, stats.Process)
-	go visionWatcher.Watch()
+	udpWatcher := vision.NewUdpWatcher(*visionAddress, stats.Process)
+	go udpWatcher.Watch()
 
 	var clockWatchers []*clock.Watcher
 	activeSources := map[string]struct{}{}
+	clockWatchersMutex := new(sync.Mutex)
 
 	for {
 		multicastSources.Mutex.Lock()
+		stats.Mutex.Lock()
+		clockWatchersMutex.Lock()
+
 		for _, source := range multicastSources.Sources {
 			if _, ok := activeSources[source]; !ok {
 				clockWatcher := clock.NewWatcher(source, *timeWindow)
+				clockWatcher.Mutex = clockWatchersMutex
 				clockWatchers = append(clockWatchers, &clockWatcher)
 				go clockWatcher.Watch()
 				activeSources[source] = struct{}{}
@@ -44,18 +50,14 @@ func main() {
 
 		fmt.Println("Vision Multicast sources:")
 		fmt.Println(strings.Join(multicastSources.Sources, " "))
-		multicastSources.Mutex.Unlock()
 
 		fmt.Println()
 		fmt.Println("Reference clocks:")
 		for _, clockWatcher := range clockWatchers {
-			clockWatcher.Mutex.Lock()
 			fmt.Println(clockWatcher.Host, " ClockOffset: ", clockWatcher.ClockOffset)
 			fmt.Println(clockWatcher.Host, "         RTT: ", clockWatcher.RTT)
-			clockWatcher.Mutex.Unlock()
 		}
 
-		stats.Mutex.Lock()
 		fmt.Println()
 		fmt.Println("Vision:")
 		for camId := range sortedCamIds(stats.CamStats) {
@@ -73,9 +75,13 @@ func main() {
 		for i := oldest; i < numLogs; i++ {
 			fmt.Println(stats.LogList[i])
 		}
-		stats.Mutex.Unlock()
 
 		fmt.Println()
+
+		clockWatchersMutex.Unlock()
+		stats.Mutex.Unlock()
+		multicastSources.Mutex.Unlock()
+
 		time.Sleep(time.Second)
 	}
 }

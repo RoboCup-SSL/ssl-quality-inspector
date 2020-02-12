@@ -12,7 +12,7 @@ type Watcher struct {
 	online      bool
 	ClockOffset *timing.Timing
 	RTT         *timing.Timing
-	Mutex       sync.Mutex
+	Mutex       *sync.Mutex
 }
 
 func NewWatcher(host string, timeWindow time.Duration) (w Watcher) {
@@ -20,6 +20,7 @@ func NewWatcher(host string, timeWindow time.Duration) (w Watcher) {
 	w.online = false
 	w.ClockOffset = new(timing.Timing)
 	w.RTT = new(timing.Timing)
+	w.Mutex = new(sync.Mutex)
 
 	*w.ClockOffset = timing.NewTiming(timeWindow)
 	*w.RTT = timing.NewTiming(timeWindow)
