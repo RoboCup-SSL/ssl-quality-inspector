@@ -7,28 +7,27 @@ import (
 	"time"
 )
 
-const maxBallVel = 10
-const maxBotVel = 6
+const maxBallVel = 10.0
+const maxBotVel = 6.0
 
 type CamStats struct {
 	FrameStats       *timing.FrameStats
 	Robots           map[TeamColor][]*RobotStats
 	Balls            []*ObjectStats
-	timeWindow       time.Duration
 	TimingProcessing *timing.Timing
 	TimingReceiving  *timing.Timing
+	statsConfig      StatsConfig
 }
 
-func NewCamStats(timeWindow time.Duration) (s CamStats) {
-
-	s.FrameStats = timing.NewFrameStats(timeWindow)
+func NewCamStats(statsConfig StatsConfig) (s CamStats) {
+	s.FrameStats = timing.NewFrameStats(statsConfig.TimeWindowQualityCam)
 	s.Robots = map[TeamColor][]*RobotStats{}
-	s.timeWindow = timeWindow
+	s.statsConfig = statsConfig
 	s.TimingProcessing = new(timing.Timing)
 	s.TimingReceiving = new(timing.Timing)
 
-	*s.TimingProcessing = timing.NewTiming(timeWindow)
-	*s.TimingReceiving = timing.NewTiming(timeWindow)
+	*s.TimingProcessing = timing.NewTiming(statsConfig.TimeWindowQualityCam)
+	*s.TimingReceiving = timing.NewTiming(statsConfig.TimeWindowQualityCam)
 
 	return s
 }
@@ -41,11 +40,11 @@ func (s CamStats) String() string {
 		len(s.Balls))
 	str += fmt.Sprintf("Processing Time: %v\n Receiving Time: %v\n", s.TimingProcessing, s.TimingReceiving)
 
-	str += "Balls: "
+	str += "Balls: \n"
 	for _, ball := range s.Balls {
-		str += fmt.Sprintf("%v  ", ball)
+		str += fmt.Sprintf("%v\n", ball)
 	}
-	str += "\n"
+	str += "Robots: \n"
 
 	for _, robot := range s.sortedRobotStats() {
 		str += fmt.Sprintf("%v %v\n", robot.Id, robot)
@@ -65,21 +64,71 @@ func (s *CamStats) Clear() {
 	}
 }
 
+func (s *CamStats) Merge() {
+	s.Balls = mergeObjects(s.Balls)
+	s.Robots[TeamYellow] = mergeRobots(s.Robots[TeamYellow])
+	s.Robots[TeamBlue] = mergeRobots(s.Robots[TeamBlue])
+}
+
+func mergeRobots(objects []*RobotStats) (mergedRobots []*RobotStats) {
+	for _, robot := range objects {
+		if matchedRobot := matchingRobot(mergedRobots, robot); matchedRobot != nil {
+			if matchedRobot.LastDetection.Time.Before(robot.LastDetection.Time) {
+				*matchedRobot = *robot
+			}
+		} else {
+			mergedRobots = append(mergedRobots, robot)
+		}
+	}
+	return
+}
+
+func matchingRobot(mergedRobots []*RobotStats, robot *RobotStats) *RobotStats {
+	for _, mergedRobot := range mergedRobots {
+		if mergedRobot.Velocity(robot.LastDetection.Time, robot.LastDetection.Pos) < maxBotVel {
+			return mergedRobot
+		}
+	}
+	return nil
+}
+
+func mergeObjects(objects []*ObjectStats) (mergedBalls []*ObjectStats) {
+	for _, ball := range objects {
+		if matchedBall := matchingObject(mergedBalls, ball); matchedBall != nil {
+			if matchedBall.LastDetection.Time.Before(ball.LastDetection.Time) {
+				*matchedBall = *ball
+			}
+		} else {
+			mergedBalls = append(mergedBalls, ball)
+		}
+	}
+	return
+}
+
+func matchingObject(mergedBalls []*ObjectStats, ball *ObjectStats) *ObjectStats {
+	for _, mergedBall := range mergedBalls {
+		if mergedBall.Velocity(ball.LastDetection.Time, ball.LastDetection.Pos) < maxBallVel {
+			return mergedBall
+		}
+	}
+	return nil
+}
+
 func (s *CamStats) Prune(tSent time.Time) {
-	s.FrameStats.Prune(tSent.Add(-s.timeWindow))
+	s.FrameStats.Prune(tSent.Add(-s.statsConfig.TimeWindowQualityCam))
 	for teamColor := range s.Robots {
 		var newRobots []*RobotStats
 		for _, robot := range s.Robots[teamColor] {
-			if tSent.Sub(robot.LastDetection.Time).Seconds() < 1 {
+			if tSent.Sub(robot.LastDetection.Time) < s.statsConfig.TimeWindowVisibility {
 				newRobots = append(newRobots, robot)
+				robot.Prune(tSent)
 			}
-			robot.Prune(tSent)
 		}
 		s.Robots[teamColor] = newRobots
 	}
 	var newBalls []*ObjectStats
 	for _, ball := range s.Balls {
-		if tSent.Sub(ball.LastDetection.Time).Seconds() < 1 {
+		if tSent.Sub(ball.LastDetection.Time) < s.statsConfig.TimeWindowVisibility {
 			newBalls = append(newBalls, ball)
 			ball.Prune(tSent)
 		}
@@ -97,26 +146,46 @@ func (s *CamStats) NumVisibleRobots(teamColor TeamColor) int {
 	return numRobots
 }
 
-func (s *CamStats) GetBallStats(tSent time.Time, newPos Position2d) *ObjectStats {
+func (s *CamStats) GetBallStats(tSent time.Time, newPos Position2d) (ballStats *ObjectStats) {
+	minV := maxBallVel
 	for _, ball := range s.Balls {
-		if ball.Matches(tSent, newPos, maxBallVel) {
-			return ball
+		if ball.LastDetection.Time == tSent {
+			// already got a sample
+			continue
+		}
+		v := ball.Velocity(tSent, newPos)
+		if v < minV {
+			ballStats = ball
+			minV = v
 		}
 	}
-	stats := NewObjectStats(Detection{Pos: newPos, Time: tSent}, s.timeWindow)
-	s.Balls = append(s.Balls, &stats)
-	return &stats
+	if ballStats == nil {
+		ballStats = new(ObjectStats)
+		*ballStats = NewObjectStats(Detection{Pos: newPos, Time: tSent}, s.statsConfig.TimeWindowQualityBall)
+		s.Balls = append(s.Balls, ballStats)
+	}
+	return
 }
 
-func (s *CamStats) GetRobotStats(id RobotId, tSent time.Time, newPos Position2d) *RobotStats {
-	for _, robot := range s.Robots[id.Color] {
-		if robot.Matches(tSent, newPos, maxBotVel) {
-			return robot
+func (s *CamStats) GetRobotStats(robotId RobotId, tSent time.Time, robotPos Position2d) (robotStats *RobotStats) {
+	minV := maxBotVel
+	for _, robot := range s.Robots[robotId.Color] {
+		if robot.LastDetection.Time == tSent {
+			// already got a sample
+			continue
+		}
+		v := robot.Velocity(tSent, robotPos)
+		if v < minV {
+			robotStats = robot
+			minV = v
 		}
 	}
-	robot := NewRobotStats(id, Detection{Pos: newPos, Time: tSent}, s.timeWindow)
-	s.Robots[id.Color] = append(s.Robots[id.Color], &robot)
-	return &robot
+	if robotStats == nil {
+		robotStats = new(RobotStats)
+		*robotStats = NewRobotStats(robotId, Detection{Pos: robotPos, Time: tSent}, s.statsConfig.TimeWindowQualityRobot)
+		s.Robots[robotId.Color] = append(s.Robots[robotId.Color], robotStats)
+	}
+	return
 }
 
 func (s *CamStats) sortedRobotStats() []*RobotStats {

@@ -7,17 +7,15 @@ import (
 )
 
 type Stats struct {
-	timeWindow time.Duration
-	maxBotId   int
-	CamStats   map[int]*CamStats
-	tPruned    time.Time
-	LogList    []string
-	Mutex      sync.Mutex
+	StatsConfig
+	CamStats map[int]*CamStats
+	tPruned  time.Time
+	LogList  []string
+	Mutex    sync.Mutex
 }
 
-func NewStats(timeWindow time.Duration, maxBotId int) (w Stats) {
-	w.timeWindow = timeWindow
-	w.maxBotId = maxBotId
+func NewStats(statsConfig StatsConfig) (w Stats) {
+	w.StatsConfig = statsConfig
 	w.CamStats = map[int]*CamStats{}
 	return w
 }
@@ -37,7 +35,7 @@ func (s *Stats) Process(wrapper *sslproto.SSL_WrapperPacket) {
 		camId := int(*wrapper.Detection.CameraId)
 		if _, ok := s.CamStats[camId]; !ok {
 			s.CamStats[camId] = new(CamStats)
-			*s.CamStats[camId] = NewCamStats(s.timeWindow)
+			*s.CamStats[camId] = NewCamStats(s.StatsConfig)
 		}
 		s.processCam(wrapper.Detection, s.CamStats[camId])
 	}
@@ -59,18 +57,9 @@ func (s *Stats) processCam(frame *sslproto.SSL_DetectionFrame, camStats *CamStat
 
 	camStats.FrameStats.Add(frameId, tSent)
 
-	for _, robot := range frame.RobotsBlue {
-		robotId := NewRobotId(int(*robot.RobotId), TeamBlue)
-		robotPos := Position2d{X: *robot.X / 1000.0, Y: *robot.Y / 1000.0}
-		robotStats := camStats.GetRobotStats(robotId, tSent, robotPos)
-		robotStats.Add(tSent, frameId, robotPos)
-	}
-	for _, robot := range frame.RobotsYellow {
-		robotId := NewRobotId(int(*robot.RobotId), TeamYellow)
-		robotPos := Position2d{X: *robot.X / 1000.0, Y: *robot.Y / 1000.0}
-		robotStats := camStats.GetRobotStats(robotId, tSent, robotPos)
-		robotStats.Add(tSent, frameId, robotPos)
-	}
+	processRobots(frame.RobotsBlue, TeamBlue, camStats, tSent, frameId)
+	processRobots(frame.RobotsYellow, TeamYellow, camStats, tSent, frameId)
+
 	for _, ball := range frame.Balls {
 		ballPos := Position2d{X: *ball.X / 1000.0, Y: *ball.Y / 1000.0}
 		ball := camStats.GetBallStats(tSent, ballPos)
@@ -78,4 +67,14 @@ func (s *Stats) processCam(frame *sslproto.SSL_DetectionFrame, camStats *CamStat
 	}
 
 	camStats.Prune(tSent)
+	camStats.Merge()
+}
+
+func processRobots(robots []*sslproto.SSL_DetectionRobot, teamColor TeamColor, camStats *CamStats, tSent time.Time, frameId uint32) {
+	for _, robot := range robots {
+		robotId := NewRobotId(int(*robot.RobotId), teamColor)
+		robotPos := Position2d{X: *robot.X / 1000.0, Y: *robot.Y / 1000.0}
+		robotStats := camStats.GetRobotStats(robotId, tSent, robotPos)
+		robotStats.Add(tSent, frameId, robotPos)
+	}
 }

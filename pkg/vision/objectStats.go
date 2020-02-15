@@ -31,14 +31,14 @@ func NewObjectStats(detection Detection, timeWindow time.Duration) (s ObjectStat
 func (s ObjectStats) String() string {
 	age := s.Age()
 	age = time.Duration(age.Milliseconds() * 1_000_000)
-	return fmt.Sprintf("%v | %v", s.FrameStats, age)
+	return fmt.Sprintf("%v | %v old | %v", s.FrameStats, age, s.LastDetection.Pos)
 }
 
-func (s *ObjectStats) Matches(t time.Time, pos Position2d, maxVel float64) bool {
+func (s *ObjectStats) Velocity(t time.Time, pos Position2d) float64 {
 	dt := t.Sub(s.LastDetection.Time).Seconds()
 	ds := s.LastDetection.Pos.DistanceTo(pos)
 	v := ds / dt
-	return v < maxVel
+	return v
 }
 
 func (s *ObjectStats) Add(tSent time.Time, frameId uint32, pos Position2d) {

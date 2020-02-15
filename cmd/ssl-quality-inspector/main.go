@@ -14,15 +14,23 @@ import (
 
 var visionAddress = flag.String("visionAddress", "224.5.23.2:10006", "The multicast address of ssl-vision")
 
-var timeWindow = flag.Duration("timeWindow", time.Millisecond*500, "The time window for taking timing statistics")
-var maxBotId = flag.Int("maxBotId", 16, "The max botId to pre-fill a slot for each robot")
+var timeWindowClock = flag.Duration("timeWindowClock", time.Millisecond*500, "The time window for watching clock timing")
+var timeWindowVisibility = flag.Duration("timeWindowVisibility", time.Second*5, "The time window for taking timing statistics")
+var timeWindowQualityCam = flag.Duration("timeWindowQualityCam", time.Millisecond*500, "The time window for measuring the camera quality")
+var timeWindowQualityBall = flag.Duration("timeWindowQualityBall", time.Millisecond*200, "The time window for measuring the ball quality")
+var timeWindowQualityRobot = flag.Duration("timeWindowQualityRobot", time.Millisecond*500, "The time window for measuring the robot quality")
 
 func main() {
 
 	multicastSources := network.NewMulticastSourceWatcher(*visionAddress)
 	go multicastSources.Watch()
 
-	stats := vision.NewStats(*timeWindow, *maxBotId)
+	var statsConfig vision.StatsConfig
+	statsConfig.TimeWindowVisibility = *timeWindowVisibility
+	statsConfig.TimeWindowQualityCam = *timeWindowQualityCam
+	statsConfig.TimeWindowQualityBall = *timeWindowQualityBall
+	statsConfig.TimeWindowQualityRobot = *timeWindowQualityRobot
+	stats := vision.NewStats(statsConfig)
 	udpWatcher := vision.NewUdpWatcher(*visionAddress, stats.Process)
 	go udpWatcher.Watch()
 
@@ -37,7 +45,7 @@ func main() {
 
 		for _, source := range multicastSources.Sources {
 			if _, ok := activeSources[source]; !ok {
-				clockWatcher := clock.NewWatcher(source, *timeWindow)
+				clockWatcher := clock.NewWatcher(source, *timeWindowClock)
 				clockWatcher.Mutex = clockWatchersMutex
 				clockWatchers = append(clockWatchers, &clockWatcher)
 				go clockWatcher.Watch()
