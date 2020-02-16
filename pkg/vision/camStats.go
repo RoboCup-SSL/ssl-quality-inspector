@@ -85,7 +85,12 @@ func mergeRobots(objects []*RobotStats) (mergedRobots []*RobotStats) {
 
 func matchingRobot(mergedRobots []*RobotStats, robot *RobotStats) *RobotStats {
 	for _, mergedRobot := range mergedRobots {
-		if mergedRobot.Velocity(robot.LastDetection.Time, robot.LastDetection.Pos) < maxBotVel {
+		if mergedRobot.LastDetection.Time == robot.LastDetection.Time {
+			// Robots can not match if they were both updated at the same time
+			continue
+		}
+		velocity := mergedRobot.Velocity(robot.LastDetection.Time, robot.LastDetection.Pos)
+		if velocity < maxBotVel {
 			return mergedRobot
 		}
 	}
@@ -107,7 +112,12 @@ func mergeObjects(objects []*ObjectStats) (mergedBalls []*ObjectStats) {
 
 func matchingObject(mergedBalls []*ObjectStats, ball *ObjectStats) *ObjectStats {
 	for _, mergedBall := range mergedBalls {
-		if mergedBall.Velocity(ball.LastDetection.Time, ball.LastDetection.Pos) < maxBallVel {
+		if mergedBall.LastDetection.Time == ball.LastDetection.Time {
+			// Balls can not match if they were both updated at the same time
+			continue
+		}
+		velocity := mergedBall.Velocity(ball.LastDetection.Time, ball.LastDetection.Pos)
+		if velocity < maxBallVel {
 			return mergedBall
 		}
 	}
