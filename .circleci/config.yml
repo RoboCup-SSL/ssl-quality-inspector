@@ -1,21 +1,5 @@
 version: 2
 jobs:
-  frontend:
-    docker:
-    - image: circleci/node:10.8.0
-    steps:
-    - checkout
-    - run:
-        name: "Install dependencies"
-        command: yarn install
-    - run:
-        name: "Build"
-        command: yarn build
-    - persist_to_workspace:
-        root: .
-        paths:
-        - dist/*
-
   backend:
     docker:
     - image: circleci/golang:1.10
@@ -23,17 +7,14 @@ jobs:
     working_directory: /go/src/github.com/RoboCup-SSL/ssl-quality-inspector
     steps:
     - checkout
-    - attach_workspace:
-        at: .
     - run: go get -v -t -d ./...
     - run: go test -v ./...
     - run:
         working_directory: cmd/ssl-quality-inspector
         command: |
-          go get -v github.com/gobuffalo/packr/packr
-          GOOS=linux GOARCH=amd64 packr build -o ../../release/ssl-quality-inspector_linux_amd64
-          GOOS=darwin GOARCH=amd64 packr build -o ../../release/ssl-quality-inspector_darwin_amd64
-          GOOS=windows GOARCH=amd64 packr build -o ../../release/ssl-quality-inspector_windows_amd64.exe
+          GOOS=linux GOARCH=amd64 go build -o ../../release/ssl-quality-inspector_linux_amd64
+          GOOS=darwin GOARCH=amd64 go build -o ../../release/ssl-quality-inspector_darwin_amd64
+          GOOS=windows GOARCH=amd64 go build -o ../../release/ssl-quality-inspector_windows_amd64.exe
     - persist_to_workspace:
         root: .
         paths:
@@ -62,10 +43,6 @@ workflows:
   version: 2
   main:
     jobs:
-    - frontend:
-        filters:
-          tags:
-            only: /.*/
     - backend:
         requires:
         - frontend
