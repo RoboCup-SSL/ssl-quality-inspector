@@ -1,7 +1,6 @@
 package vision
 
 import (
-	"github.com/RoboCup-SSL/ssl-go-tools/pkg/sslproto"
 	"github.com/golang/protobuf/proto"
 	"log"
 	"net"
@@ -12,10 +11,10 @@ const maxDatagramSize = 8192
 
 type UdpWatcher struct {
 	Address  string
-	Callback func(*sslproto.SSL_WrapperPacket)
+	Callback func(*SSL_WrapperPacket)
 }
 
-func NewUdpWatcher(address string, callback func(*sslproto.SSL_WrapperPacket)) (w UdpWatcher) {
+func NewUdpWatcher(address string, callback func(*SSL_WrapperPacket)) (w UdpWatcher) {
 	w.Address = address
 	w.Callback = callback
 	return w
@@ -37,7 +36,7 @@ func (w *UdpWatcher) Watch() {
 		log.Printf("Could not set read buffer to %v.", maxDatagramSize)
 	}
 
-	c1 := make(chan *sslproto.SSL_WrapperPacket, 10)
+	c1 := make(chan *SSL_WrapperPacket, 10)
 	go w.receive(conn, c1)
 	for {
 		select {
@@ -49,7 +48,7 @@ func (w *UdpWatcher) Watch() {
 	}
 }
 
-func (w *UdpWatcher) receive(conn *net.UDPConn, c1 chan *sslproto.SSL_WrapperPacket) {
+func (w *UdpWatcher) receive(conn *net.UDPConn, c1 chan *SSL_WrapperPacket) {
 	b := make([]byte, maxDatagramSize)
 	for {
 		n, err := conn.Read(b)
@@ -60,7 +59,7 @@ func (w *UdpWatcher) receive(conn *net.UDPConn, c1 chan *sslproto.SSL_WrapperPac
 			log.Print("Buffer size too small")
 		}
 
-		wrapper := new(sslproto.SSL_WrapperPacket)
+		wrapper := new(SSL_WrapperPacket)
 		if err := proto.Unmarshal(b[0:n], wrapper); err != nil {
 			log.Println("Could not unmarshal message")
 			continue

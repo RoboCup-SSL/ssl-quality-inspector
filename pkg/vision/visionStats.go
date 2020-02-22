@@ -1,7 +1,6 @@
 package vision
 
 import (
-	"github.com/RoboCup-SSL/ssl-go-tools/pkg/sslproto"
 	"sync"
 	"time"
 )
@@ -25,7 +24,7 @@ func (s *Stats) Log(tSent time.Time, str string) {
 	s.LogList = append(s.LogList, timeFormatted+": "+str)
 }
 
-func (s *Stats) Process(wrapper *sslproto.SSL_WrapperPacket) {
+func (s *Stats) Process(wrapper *SSL_WrapperPacket) {
 	s.Mutex.Lock()
 	if wrapper == nil {
 		for _, camStats := range s.CamStats {
@@ -42,7 +41,7 @@ func (s *Stats) Process(wrapper *sslproto.SSL_WrapperPacket) {
 	s.Mutex.Unlock()
 }
 
-func (s *Stats) processCam(frame *sslproto.SSL_DetectionFrame, camStats *CamStats) {
+func (s *Stats) processCam(frame *SSL_DetectionFrame, camStats *CamStats) {
 
 	frameId := *frame.FrameNumber
 	processingTime := time.Duration(int64((*frame.TSent - *frame.TCapture) * 1e9))
@@ -70,7 +69,7 @@ func (s *Stats) processCam(frame *sslproto.SSL_DetectionFrame, camStats *CamStat
 	camStats.Merge()
 }
 
-func processRobots(robots []*sslproto.SSL_DetectionRobot, teamColor TeamColor, camStats *CamStats, tSent time.Time, frameId uint32) {
+func processRobots(robots []*SSL_DetectionRobot, teamColor TeamColor, camStats *CamStats, tSent time.Time, frameId uint32) {
 	for _, robot := range robots {
 		robotId := NewRobotId(int(*robot.RobotId), teamColor)
 		robotPos := Position2d{X: *robot.X / 1000.0, Y: *robot.Y / 1000.0}
