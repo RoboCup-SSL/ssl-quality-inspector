@@ -1,3 +1,8 @@
+[![CircleCI](https://circleci.com/gh/RoboCup-SSL/ssl-quality-inspector/tree/master.svg?style=svg)](https://circleci.com/gh/RoboCup-SSL/ssl-quality-inspector/tree/master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/RoboCup-SSL/ssl-quality-inspector?style=flat-square)](https://goreportcard.com/report/github.com/RoboCup-SSL/ssl-quality-inspector)
+[![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/RoboCup-SSL/ssl-quality-inspector/pkg/vision)
+[![Release](https://img.shields.io/github/release/RoboCup-SSL/ssl-quality-inspector.svg?style=flat-square)](https://github.com/RoboCup-SSL/ssl-quality-inspector/releases/latest)
+
 # ssl-quality-inspector
 Command line utility to inspect several metrics like network latency and ssl-vision detection
 
