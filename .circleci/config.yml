@@ -2,7 +2,7 @@ version: 2
 jobs:
   backend:
     docker:
-    - image: circleci/golang:1.10
+    - image: circleci/golang:1.13
 
     working_directory: /go/src/github.com/RoboCup-SSL/ssl-quality-inspector
     steps:
@@ -22,7 +22,7 @@ jobs:
 
   publish-github-release:
     docker:
-    - image: circleci/golang:1.10
+    - image: circleci/golang:1.13
     steps:
     - attach_workspace:
         at: .
