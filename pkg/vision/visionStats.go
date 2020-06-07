@@ -7,16 +7,19 @@ import (
 
 type Stats struct {
 	StatsConfig
-	CamStats map[int]*CamStats
-	tPruned  time.Time
-	LogList  []string
-	Mutex    sync.Mutex
+	CamStats         map[int]*CamStats
+	tPruned          time.Time
+	LogList          []string
+	Mutex            sync.Mutex
+	DataLossDetector *DataLossDetector
 }
 
-func NewStats(statsConfig StatsConfig) (w Stats) {
-	w.StatsConfig = statsConfig
-	w.CamStats = map[int]*CamStats{}
-	return w
+func NewStats(statsConfig StatsConfig) (s *Stats) {
+	s = new(Stats)
+	s.StatsConfig = statsConfig
+	s.CamStats = map[int]*CamStats{}
+	s.DataLossDetector = NewDataLossDetector()
+	return s
 }
 
 func (s *Stats) Log(tSent time.Time, str string) {
@@ -37,6 +40,7 @@ func (s *Stats) Process(wrapper *SSL_WrapperPacket) {
 			*s.CamStats[camId] = NewCamStats(s.StatsConfig)
 		}
 		s.processCam(wrapper.Detection, s.CamStats[camId])
+		s.DataLossDetector.ProcessDetection(wrapper.Detection)
 	}
 	s.Mutex.Unlock()
 }
