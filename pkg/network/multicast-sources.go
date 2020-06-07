@@ -10,21 +10,24 @@ import (
 const maxDatagramSize = 8192
 
 type MulticastSourceWatcher struct {
-	Address string
-	Sources []string
-	Mutex   sync.Mutex
+	sources []string
+	mutex   sync.Mutex
 }
 
-func NewMulticastSourceWatcher(address string) (w MulticastSourceWatcher) {
-	w.Address = address
+func NewMulticastSourceWatcher() (w *MulticastSourceWatcher) {
+	w = new(MulticastSourceWatcher)
 	return w
 }
 
-func (w *MulticastSourceWatcher) Watch() {
-	w.watchAddress(w.Address)
+func (w *MulticastSourceWatcher) GetSources() []string {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+	cpy := make([]string, len(w.sources))
+	copy(cpy, w.sources)
+	return cpy
 }
 
-func (w *MulticastSourceWatcher) watchAddress(address string) {
+func (w *MulticastSourceWatcher) Watch(address string) {
 	addr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		log.Fatal(err)
@@ -44,18 +47,18 @@ func (w *MulticastSourceWatcher) watchAddress(address string) {
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		w.Mutex.Lock()
+		w.mutex.Lock()
 		w.addSource(address, udpAddr.IP.String())
-		w.Mutex.Unlock()
+		w.mutex.Unlock()
 	}
 }
 
 func (w *MulticastSourceWatcher) addSource(address string, remote string) {
-	for _, a := range w.Sources {
+	for _, a := range w.sources {
 		if a == remote {
 			return
 		}
 	}
-	w.Sources = append(w.Sources, remote)
+	w.sources = append(w.sources, remote)
 	log.Printf("remote ip on %v: %v\n", address, remote)
 }

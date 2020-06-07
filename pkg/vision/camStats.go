@@ -19,15 +19,13 @@ type CamStats struct {
 	statsConfig      StatsConfig
 }
 
-func NewCamStats(statsConfig StatsConfig) (s CamStats) {
+func NewCamStats(statsConfig StatsConfig) (s *CamStats) {
+	s = new(CamStats)
 	s.FrameStats = timing.NewFrameStats(statsConfig.TimeWindowQualityCam)
 	s.Robots = map[TeamColor][]*RobotStats{}
 	s.statsConfig = statsConfig
-	s.TimingProcessing = new(timing.Timing)
-	s.TimingReceiving = new(timing.Timing)
-
-	*s.TimingProcessing = timing.NewTiming(statsConfig.TimeWindowQualityCam)
-	*s.TimingReceiving = timing.NewTiming(statsConfig.TimeWindowQualityCam)
+	s.TimingProcessing = timing.NewTiming(statsConfig.TimeWindowQualityCam)
+	s.TimingReceiving = timing.NewTiming(statsConfig.TimeWindowQualityCam)
 
 	return s
 }
@@ -170,8 +168,7 @@ func (s *CamStats) GetBallStats(tSent time.Time, newPos Position2d) (ballStats *
 		}
 	}
 	if ballStats == nil {
-		ballStats = new(ObjectStats)
-		*ballStats = NewObjectStats(Detection{Pos: newPos, Time: tSent}, s.statsConfig.TimeWindowQualityBall)
+		ballStats = NewObjectStats(Detection{Pos: newPos, Time: tSent}, s.statsConfig.TimeWindowQualityBall)
 		s.Balls = append(s.Balls, ballStats)
 	}
 	return

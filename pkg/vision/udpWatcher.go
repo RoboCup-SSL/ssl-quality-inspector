@@ -10,18 +10,16 @@ import (
 const maxDatagramSize = 8192
 
 type UdpWatcher struct {
-	Address  string
 	Callback func(*SSL_WrapperPacket)
 }
 
-func NewUdpWatcher(address string, callback func(*SSL_WrapperPacket)) (w UdpWatcher) {
-	w.Address = address
+func NewUdpWatcher(callback func(*SSL_WrapperPacket)) (w UdpWatcher) {
 	w.Callback = callback
 	return w
 }
 
-func (w *UdpWatcher) Watch() {
-	addr, err := net.ResolveUDPAddr("udp", w.Address)
+func (w *UdpWatcher) Watch(address string) {
+	addr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		log.Print(err)
 		return

@@ -18,7 +18,8 @@ type Detection struct {
 	Pos  Position2d
 }
 
-func NewObjectStats(detection Detection, timeWindow time.Duration) (s ObjectStats) {
+func NewObjectStats(detection Detection, timeWindow time.Duration) (s *ObjectStats) {
+	s = new(ObjectStats)
 	s.FrameStats = timing.NewFrameStats(timeWindow)
 	s.FirstDetection = detection
 	s.LastDetection = detection

@@ -8,7 +8,6 @@ import (
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/vision"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -22,8 +21,8 @@ var timeWindowQualityRobot = flag.Duration("timeWindowQualityRobot", time.Millis
 
 func main() {
 
-	multicastSources := network.NewMulticastSourceWatcher(*visionAddress)
-	go multicastSources.Watch()
+	multicastSources := network.NewMulticastSourceWatcher()
+	go multicastSources.Watch(*visionAddress)
 
 	var statsConfig vision.StatsConfig
 	statsConfig.TimeWindowVisibility = *timeWindowVisibility
@@ -31,25 +30,22 @@ func main() {
 	statsConfig.TimeWindowQualityBall = *timeWindowQualityBall
 	statsConfig.TimeWindowQualityRobot = *timeWindowQualityRobot
 	stats := vision.NewStats(statsConfig)
-	udpWatcher := vision.NewUdpWatcher(*visionAddress, stats.Process)
-	go udpWatcher.Watch()
+	udpWatcher := vision.NewUdpWatcher(stats.Process)
+	go udpWatcher.Watch(*visionAddress)
 
-	var clockWatchers []*clock.Watcher
-	activeSources := map[string]struct{}{}
-	clockWatchersMutex := new(sync.Mutex)
+	clockWatchers := map[string]*clock.Watcher{}
+	activeSources := map[string]bool{}
 
 	for {
-		multicastSources.Mutex.Lock()
 		stats.Mutex.Lock()
-		clockWatchersMutex.Lock()
 
-		for _, source := range multicastSources.Sources {
+		multicastSources := multicastSources.GetSources()
+		for _, source := range multicastSources {
 			if _, ok := activeSources[source]; !ok {
-				clockWatcher := clock.NewWatcher(source, *timeWindowClock)
-				clockWatcher.Mutex = clockWatchersMutex
-				clockWatchers = append(clockWatchers, &clockWatcher)
-				go clockWatcher.Watch()
-				activeSources[source] = struct{}{}
+				clockWatcher := clock.NewWatcher(*timeWindowClock)
+				clockWatchers[source] = clockWatcher
+				go clockWatcher.Watch(source)
+				activeSources[source] = true
 			}
 		}
 
@@ -57,13 +53,14 @@ func main() {
 		fmt.Print("\033[H\033[2J")
 
 		fmt.Println("Vision Multicast sources:")
-		fmt.Println(strings.Join(multicastSources.Sources, " "))
+		fmt.Println(strings.Join(multicastSources, " "))
 
 		fmt.Println()
 		fmt.Println("Reference clocks:")
-		for _, clockWatcher := range clockWatchers {
-			fmt.Println(clockWatcher.Host, " ClockOffset: ", clockWatcher.ClockOffset)
-			fmt.Println(clockWatcher.Host, "         RTT: ", clockWatcher.RTT)
+		for source, clockWatcher := range clockWatchers {
+			watcherData := clockWatcher.GetData()
+			fmt.Println(source, " ClockOffset: ", watcherData.ClockOffset)
+			fmt.Println(source, "         RTT: ", watcherData.RTT)
 		}
 
 		fmt.Println()
@@ -86,9 +83,7 @@ func main() {
 
 		fmt.Println()
 
-		clockWatchersMutex.Unlock()
 		stats.Mutex.Unlock()
-		multicastSources.Mutex.Unlock()
 
 		time.Sleep(time.Second)
 	}

@@ -6,43 +6,44 @@ import (
 )
 
 type Fps struct {
-	TimeWindow time.Duration
+	timeWindow time.Duration
 	durations  map[time.Time]struct{}
 	mutex      sync.Mutex
 }
 
-func NewFps(timeWindow time.Duration) (t Fps) {
-	t.TimeWindow = timeWindow
+func NewFps(timeWindow time.Duration) (t *Fps) {
+	t = new(Fps)
+	t.timeWindow = timeWindow
 	t.durations = map[time.Time]struct{}{}
 	return t
 }
 
 func (f *Fps) Inc() {
 	f.mutex.Lock()
-	f.durations[time.Now()] = struct{}{}
-	f.mutex.Unlock()
+	defer f.mutex.Unlock()
+	now := time.Now()
+	f.durations[now] = struct{}{}
+	f.prune(now)
 }
 
-func (f *Fps) Prune() {
-	f.mutex.Lock()
-	lastValidMeasureTime := time.Now().Add(-f.TimeWindow)
+func (f *Fps) prune(now time.Time) {
+	lastValidMeasureTime := now.Add(-f.timeWindow)
 	for measuredTime := range f.durations {
 		if measuredTime.Before(lastValidMeasureTime) {
 			delete(f.durations, measuredTime)
 		}
 	}
-	f.mutex.Unlock()
 }
 
 func (f *Fps) Clear() {
 	f.mutex.Lock()
+	defer f.mutex.Unlock()
 	f.durations = map[time.Time]struct{}{}
-	f.mutex.Unlock()
 }
 
 func (f *Fps) Float32() float32 {
 	f.mutex.Lock()
+	defer f.mutex.Unlock()
 	numDurations := len(f.durations)
-	f.mutex.Unlock()
-	return float32(numDurations) / float32(f.TimeWindow.Seconds())
+	return float32(numDurations) / float32(f.timeWindow.Seconds())
 }

@@ -13,7 +13,8 @@ type Stats struct {
 	Mutex    sync.Mutex
 }
 
-func NewStats(statsConfig StatsConfig) (w Stats) {
+func NewStats(statsConfig StatsConfig) (w *Stats) {
+	w = new(Stats)
 	w.StatsConfig = statsConfig
 	w.CamStats = map[int]*CamStats{}
 	return w
@@ -33,8 +34,7 @@ func (s *Stats) Process(wrapper *SSL_WrapperPacket) {
 	} else if wrapper.Detection != nil {
 		camId := int(*wrapper.Detection.CameraId)
 		if _, ok := s.CamStats[camId]; !ok {
-			s.CamStats[camId] = new(CamStats)
-			*s.CamStats[camId] = NewCamStats(s.StatsConfig)
+			s.CamStats[camId] = NewCamStats(s.StatsConfig)
 		}
 		s.processCam(wrapper.Detection, s.CamStats[camId])
 	}

@@ -3,6 +3,7 @@ package timing
 import (
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -13,19 +14,25 @@ type Timing struct {
 	Avg        time.Duration
 	Median     time.Duration
 	durations  map[time.Time]time.Duration
+	mutex      sync.Mutex
 }
 
-func NewTiming(timeWindow time.Duration) (t Timing) {
+func NewTiming(timeWindow time.Duration) (t *Timing) {
+	t = new(Timing)
 	t.TimeWindow = timeWindow
 	t.durations = map[time.Time]time.Duration{}
 	return t
 }
 
 func (t *Timing) Clear() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 	t.durations = map[time.Time]time.Duration{}
 }
 
 func (t *Timing) Add(duration time.Duration) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 	now := time.Now()
 	t.durations[now] = duration
 
@@ -66,6 +73,8 @@ func (t *Timing) sortedDurations() []time.Duration {
 	return durations
 }
 
-func (t Timing) String() string {
+func (t *Timing) String() string {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
 	return fmt.Sprintf("Min: %10v Max: %10v Avg: %10v Median: %10v (%v measures in %v)", t.Min, t.Max, t.Avg, t.Median, len(t.durations), t.TimeWindow)
 }

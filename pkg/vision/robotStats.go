@@ -6,7 +6,7 @@ import (
 
 type RobotStats struct {
 	Id RobotId
-	ObjectStats
+	*ObjectStats
 }
 
 func NewRobotStats(robotId RobotId, detection Detection, timeWindow time.Duration) (s RobotStats) {
