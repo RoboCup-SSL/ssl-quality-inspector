@@ -21,6 +21,8 @@ var timeWindowQualityRobot = flag.Duration("timeWindowQualityRobot", time.Millis
 
 func main() {
 
+	flag.Parse()
+
 	multicastSources := network.NewMulticastSourceWatcher()
 	go multicastSources.Watch(*visionAddress)
 
