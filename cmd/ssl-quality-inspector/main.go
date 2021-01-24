@@ -51,6 +51,11 @@ func main() {
 			}
 		}
 
+		watcherDataMap := map[string]clock.Data{}
+		for source, clockWatcher := range clockWatchers {
+			watcherDataMap[source] = *clockWatcher.GetData()
+		}
+
 		// clear screen, move cursor to upper left corner
 		fmt.Print("\033[H\033[2J")
 
@@ -59,8 +64,7 @@ func main() {
 
 		fmt.Println()
 		fmt.Println("Reference clocks:")
-		for source, clockWatcher := range clockWatchers {
-			watcherData := clockWatcher.GetData()
+		for source, watcherData := range watcherDataMap {
 			fmt.Println(source, " ClockOffset: ", watcherData.ClockOffset)
 			fmt.Println(source, "         RTT: ", watcherData.RTT)
 		}
