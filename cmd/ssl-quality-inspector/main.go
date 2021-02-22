@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/clock"
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/network"
+	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/sslnet"
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/vision"
+	"github.com/golang/protobuf/proto"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -32,8 +35,15 @@ func main() {
 	statsConfig.TimeWindowQualityBall = *timeWindowQualityBall
 	statsConfig.TimeWindowQualityRobot = *timeWindowQualityRobot
 	stats := vision.NewStats(statsConfig)
-	udpWatcher := vision.NewUdpWatcher(stats.Process)
-	go udpWatcher.Watch(*visionAddress)
+	mcServer := sslnet.NewMulticastServer(func(bytes []byte) {
+		wrapper := new(vision.SSL_WrapperPacket)
+		if err := proto.Unmarshal(bytes, wrapper); err != nil {
+			log.Println("Could not unmarshal message")
+		} else {
+			stats.Process(wrapper)
+		}
+	})
+	mcServer.Start(*visionAddress)
 
 	clockWatchers := map[string]*clock.Watcher{}
 	activeSources := map[string]bool{}
