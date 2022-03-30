@@ -1,4 +1,4 @@
-FROM golang:1.14-alpine AS build
+FROM golang:1.18-alpine AS build
 WORKDIR /go/src/github.com/RoboCup-SSL/ssl-quality-inspector
 COPY go.mod go.mod
 COPY cmd cmd
