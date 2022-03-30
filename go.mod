@@ -3,7 +3,7 @@ module github.com/RoboCup-SSL/ssl-quality-inspector
 go 1.13
 
 require (
-	github.com/beevik/ntp v0.2.0
+	github.com/beevik/ntp v0.3.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.3.3
 	github.com/kr/pretty v0.1.0 // indirect
