@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+option go_package = "github.com/RoboCup-SSL/ssl-quality-inspector/pkg/visualization";
+
 // Color encoded in RGB
 message RgbColor {
     // red (0-255)
