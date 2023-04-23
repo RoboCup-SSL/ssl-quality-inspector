@@ -6,25 +6,31 @@
 # ssl-quality-inspector
 Command line utility to inspect several metrics like network latency and ssl-vision detection
 
-## Requirements
-You need to install following dependencies first: 
- * Go >= 1.11
- 
-## Installation
+### Requirements
 
-Use go get to install all packages / executables:
+You need to install following dependencies first:
 
-```
-go get -u github.com/RoboCup-SSL/ssl-quality-inspector/...
-```
+* Go
 
-## Run
-The executables are installed to your $GOPATH/bin folder. If you have it on your $PATH, you can directly run them. 
-Else, switch to this folder first.
+See [.circleci/config.yml](.circleci/config.yml) for compatible versions.
 
-The quality inspector can be run by:
-```
-ssl-quality-inspector
+### Build
+Build and install all binaries:
+
+```shell
+make install
 ```
 
-Available parameters can be retrieved with the `-h` option.
+### Run
+Build and run main binary:
+
+```shell
+make run
+```
+
+### Update generated protobuf code
+Generate the code for the `.proto` files after you've changed anything in a `.proto` file with:
+
+```shell
+make proto
+```
