@@ -1,12 +1,16 @@
-FROM golang:1.18-alpine AS build
-WORKDIR /go/src/github.com/RoboCup-SSL/ssl-quality-inspector
-COPY go.mod go.mod
-COPY cmd cmd
-COPY pkg pkg
-RUN go install ./...
+FROM golang:1.20-alpine AS build_go
+ARG cmd
+WORKDIR work
+COPY . .
+RUN go install ./cmd/${cmd}
 
 # Start fresh from a smaller image
-FROM alpine:3.15
-COPY --from=build /go/bin/ssl-quality-inspector /app/ssl-quality-inspector
-ENTRYPOINT ["/app/ssl-quality-inspector"]
+FROM alpine:3
+ARG cmd
+COPY --from=build_go /go/bin/${cmd} /app/${cmd}
+WORKDIR /data
+RUN chown 1000: /data
+USER 1000
+ENV COMMAND="/app/${cmd}"
+ENTRYPOINT "${COMMAND}"
 CMD []

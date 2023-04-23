@@ -1,57 +1,110 @@
-version: 2
+version: 2.1
+parameters:
+  cmds:
+    type: string
+    default: "ssl-quality-inspector"
+
 jobs:
-  backend:
+  test_go:
+    resource_class: medium
     docker:
-    - image: circleci/golang:1.17
-
-    working_directory: /go/src/github.com/RoboCup-SSL/ssl-quality-inspector
+      - image: cimg/go:1.20.2
     steps:
-    - checkout
-    - run: go get -v -t -d ./...
-    - run: go test -v ./...
-    - run:
-        working_directory: cmd/ssl-quality-inspector
-        command: |
-          GOOS=linux GOARCH=amd64 go build -o ../../release/ssl-quality-inspector_linux_amd64
-          GOOS=darwin GOARCH=amd64 go build -o ../../release/ssl-quality-inspector_darwin_amd64
-          GOOS=windows GOARCH=amd64 go build -o ../../release/ssl-quality-inspector_windows_amd64.exe
-    - persist_to_workspace:
-        root: .
-        paths:
-        - release/*
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: go get -v -t -d ./...
+      - run: go test -v -covermode=count -coverprofile=count.out ./...
+      - run: go tool cover -html=count.out -o coverage.html
+      - store_artifacts:
+          path: coverage.html
+          destination: coverage
 
-  publish-github-release:
+  build_go:
+    resource_class: large
     docker:
-    - image: circleci/golang:1.17
+      - image: cimg/go:1.20.2
     steps:
-    - attach_workspace:
-        at: .
-    - run:
-        name: "Prepare artifacts"
-        working_directory: release
-        command: |
-          mv ssl-quality-inspector_linux_amd64 ssl-quality-inspector_${CIRCLE_TAG}_linux_amd64
-          mv ssl-quality-inspector_darwin_amd64 ssl-quality-inspector_${CIRCLE_TAG}_darwin_amd64
-          mv ssl-quality-inspector_windows_amd64.exe ssl-quality-inspector_${CIRCLE_TAG}_windows_amd64.exe
-    - run:
-        name: "Publish Release on GitHub"
-        command: |
-          go get github.com/tcnksm/ghr
-          ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${CIRCLE_TAG} ./release/
+      - checkout
+      - attach_workspace:
+          at: .
+      - run: go get -v -t -d ./...
+      - run: |
+          set -u
+          version=${CIRCLE_TAG:-}
+          for cmd in << pipeline.parameters.cmds >>; do
+            GOOS=linux GOARCH=amd64 go build -o ./release/${cmd}_${version}_linux_amd64 ./cmd/${cmd}
+            GOOS=linux GOARCH=arm64 go build -o ./release/${cmd}_${version}_linux_arm64 ./cmd/${cmd}
+            GOOS=linux GOARCH=arm go build -o ./release/${cmd}_${version}_linux_arm ./cmd/${cmd}
+            GOOS=darwin GOARCH=amd64 go build -o ./release/${cmd}_${version}_darwin_amd64 ./cmd/${cmd}
+            GOOS=darwin GOARCH=arm64 go build -o ./release/${cmd}_${version}_darwin_arm64 ./cmd/${cmd}
+            GOOS=windows GOARCH=amd64 go build -o ./release/${cmd}_${version}_windows_amd64.exe ./cmd/${cmd}
+          done
+      - persist_to_workspace:
+          root: .
+          paths:
+            - release/*
+
+  publish_gh:
+    resource_class: small
+    docker:
+      - image: cimg/go:1.20.2
+    steps:
+      - attach_workspace:
+          at: .
+      - run: |
+          set -u
+          go install github.com/tcnksm/ghr@v0.16.0
+          ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete -generatenotes ${CIRCLE_TAG} ./release
+
+  build_docker:
+    resource_class: small
+    docker:
+      - image: cimg/base:2023.04
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 20.10.18
+      - run: |
+          for cmd in << pipeline.parameters.cmds >>; do
+            docker build --build-arg cmd=${cmd} -t robocupssl/${cmd}:latest .
+          done
+
+  publish_docker:
+    resource_class: small
+    docker:
+      - image: cimg/base:2023.04
+    steps:
+      - checkout
+      - setup_remote_docker:
+          version: 20.10.18
+      - run: |
+          # Parse version from tag (removing 'v' prefix)
+          TAG=${CIRCLE_TAG:1}
+          TAG=${TAG:-latest}
+          for cmd in << pipeline.parameters.cmds >>; do
+            docker build --build-arg cmd=${cmd} -t robocupssl/${cmd}:${TAG} .
+            docker login -u "${DOCKER_HUB_USERNAME}" -p "${DOCKER_HUB_PASSWORD}"
+            docker push robocupssl/${cmd}:${TAG}
+          done
 
 workflows:
   version: 2
-  main:
+  build:
     jobs:
-    - backend:
-        filters:
-          tags:
-            only: /.*/
-    - publish-github-release:
-        requires:
-        - backend
-        filters:
-          branches:
-            ignore: /.*/
-          tags:
-            only: /^v.*/
+      - test_go
+  release:
+    jobs:
+      - build_go:
+          filters: { branches: { ignore: /.*/ }, tags: { only: /^v.*/ } }
+      - publish_gh:
+          context: github
+          requires: [ build_go ]
+          filters: { branches: { ignore: /.*/ }, tags: { only: /^v.*/ } }
+  docker:
+    jobs:
+      - build_docker:
+          filters: { branches: { ignore: master } }
+      - publish_docker:
+          context: docker hub
+          filters: { branches: { only: master }, tags: { only: /^v.*/ } }
