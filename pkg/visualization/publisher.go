@@ -1,7 +1,7 @@
 package visualization
 
 import (
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"log"
 	"net"
 )

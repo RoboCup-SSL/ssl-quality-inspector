@@ -7,7 +7,7 @@ import (
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/network"
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/sslnet"
 	"github.com/RoboCup-SSL/ssl-quality-inspector/pkg/vision"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"log"
 	"sort"
 	"strings"
