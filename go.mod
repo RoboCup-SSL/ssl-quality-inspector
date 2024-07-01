@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/beevik/ntp v1.4.3
-	google.golang.org/protobuf v1.34.1
+	google.golang.org/protobuf v1.34.2
 )
 
 require (
