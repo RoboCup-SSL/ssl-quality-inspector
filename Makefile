@@ -17,3 +17,8 @@ install:
 
 proto:
 	tools/generateProto.sh
+
+update-go:
+	go get -v -u all
+
+update: update-go proto
