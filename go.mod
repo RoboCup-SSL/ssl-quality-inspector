@@ -1,12 +1,12 @@
 module github.com/RoboCup-SSL/ssl-quality-inspector
 
-go 1.21
+go 1.22
 
 toolchain go1.23.4
 
 require (
 	github.com/beevik/ntp v1.4.3
-	google.golang.org/protobuf v1.36.2
+	google.golang.org/protobuf v1.36.6
 )
 
 require (
