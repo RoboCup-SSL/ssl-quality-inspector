@@ -2,7 +2,7 @@ module github.com/RoboCup-SSL/ssl-quality-inspector
 
 go 1.22
 
-toolchain go1.24.3
+toolchain go1.24.4
 
 require (
 	github.com/beevik/ntp v1.4.3
