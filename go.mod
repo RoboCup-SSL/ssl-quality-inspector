@@ -1,17 +1,17 @@
 module github.com/RoboCup-SSL/ssl-quality-inspector
 
-go 1.23
+go 1.24.0
 
 toolchain go1.25.3
 
 require (
-	github.com/beevik/ntp v1.4.3
+	github.com/beevik/ntp v1.5.0
 	google.golang.org/protobuf v1.36.10
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/stretchr/testify v1.9.0 // indirect
-	golang.org/x/net v0.34.0 // indirect
-	golang.org/x/sys v0.29.0 // indirect
+	github.com/stretchr/testify v1.11.1 // indirect
+	golang.org/x/net v0.44.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
 )
