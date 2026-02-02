@@ -6,7 +6,7 @@ toolchain go1.25.6
 
 require (
 	github.com/beevik/ntp v1.5.0
-	google.golang.org/protobuf v1.36.10
+	google.golang.org/protobuf v1.36.11
 )
 
 require (
